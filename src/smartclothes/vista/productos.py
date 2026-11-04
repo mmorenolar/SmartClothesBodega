@@ -1,17 +1,28 @@
-"""Alta, edición, ingreso de stock y consulta de pantalones, calzado y poleras."""
+"""Productos: buscador, tabla con fotos y panel lateral para crear, editar e ingresar stock."""
 
 import tkinter as tk
 from tkinter import filedialog, ttk
 
+from smartclothes.vista import tema
 from smartclothes.vista.comun import (
+    COLORES,
     Pantalla,
+    Tarjeta,
     cargar_miniatura,
+    chip,
+    chip_estado_producto,
     crear_tabla,
+    encabezado,
+    etiqueta_campo,
+    fila,
     informar,
     mostrar_error,
     pedir_confirmacion,
-    titulo,
+    pintar_chip,
+    separador,
 )
+
+FILTROS = ("Todos", "Pantalón", "Calzado", "Polera", "Agotados")
 
 
 class Productos(Pantalla):
@@ -20,106 +31,164 @@ class Productos(Pantalla):
         self._sku: str | None = None
         self._miniaturas: dict[str, tk.PhotoImage] = {}
         self._vista_previa: tk.PhotoImage | None = None
-        titulo(self, "Productos")
-        ttk.Label(
-            self,
-            text="Selecciona una fila para editarla. El stock solo cambia con un ingreso, un traslado o una merma.",
-        ).pack(anchor="w", pady=(0, 8))
 
-        superior = ttk.Frame(self)
-        superior.pack(fill="x")
-        formulario = ttk.LabelFrame(superior, text="Datos de la prenda", padding=12)
-        formulario.pack(side="left", fill="both", expand=True)
+        cabecera = encabezado(self, "Productos", "Prendas en bodega. Haz clic en una fila para ver su ficha.")
+        ttk.Button(cabecera, text="+  Nueva prenda", style="Primario.TButton", command=self.limpiar).pack(
+            side="right"
+        )
+
+        # ----- Barra de búsqueda y filtros -----
+        barra = Tarjeta(self, padding=12)
+        barra.pack(fill="x", pady=(0, 14))
+        self.busqueda = tk.StringVar()
+        buscador = ttk.Entry(barra, textvariable=self.busqueda, width=34)
+        buscador.pack(side="left")
+        self._marcador(buscador, "Buscar por SKU, nombre o color…")
+        self.busqueda.trace_add("write", lambda *_a: self._llenar_tabla())
+        self.filtro = tk.StringVar(value="Todos")
+        segmentos = tk.Frame(barra, bg=COLORES["tarjeta"])
+        segmentos.pack(side="left", padx=16)
+        for texto in FILTROS:
+            ttk.Radiobutton(segmentos, text=texto, value=texto, variable=self.filtro, style="Segmento.Toolbutton",
+                            command=self._llenar_tabla).pack(side="left", padx=(0, 4))
+        self.contador = ttk.Label(barra, style="Ayuda.TLabel")
+        self.contador.pack(side="right")
+
+        # ----- Cuerpo: tabla a la izquierda, ficha a la derecha -----
+        cuerpo = ttk.Frame(self)
+        cuerpo.pack(fill="both", expand=True)
+        cuerpo.columnconfigure(0, weight=1)
+        cuerpo.rowconfigure(0, weight=1)
+
+        tarjeta_tabla = Tarjeta(cuerpo, padding=8)
+        tarjeta_tabla.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
+        marco, self.tabla = crear_tabla(
+            tarjeta_tabla,
+            ("sku", "nombre", "talla", "color", "stock", "estado"),
+            ("SKU", "Prenda", "Talla", "Color", "Stock", "Estado"),
+            (132, 132, 50, 66, 55, 106),
+            altura=7,
+            con_imagen=True,
+        )
+        marco.pack(fill="both", expand=True)
+        self.tabla.bind("<<TreeviewSelect>>", self.al_seleccionar)
+
+        self._crear_panel(cuerpo)
+        self.limpiar()
+
+    # ----- Construcción del panel -----
+
+    def _crear_panel(self, cuerpo) -> None:
+        panel = Tarjeta(cuerpo, padding=18, width=340)
+        panel.grid(row=0, column=1, sticky="nsew")
+        panel.grid_propagate(False)
+        panel.columnconfigure(0, weight=1)
+        panel.columnconfigure(1, weight=1)
+
+        cabeza = tk.Frame(panel, bg=COLORES["tarjeta"])
+        cabeza.grid(row=0, column=0, columnspan=2, sticky="ew")
+        self.lbl_panel = ttk.Label(cabeza, text="Nueva prenda", style="Seccion.TLabel")
+        self.lbl_panel.pack(side="left")
+        self.chip_estado = chip(cabeza, "", "neutro")
+
+        foto = tk.Frame(panel, bg=COLORES["tarjeta"])
+        foto.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 8))
+        caja = tk.Frame(foto, bg=COLORES["fondo"], width=96, height=96)
+        caja.pack(side="left")
+        caja.pack_propagate(False)
+        self.lbl_previa = tk.Label(caja, text="Sin\nfoto", bg=COLORES["fondo"], fg=COLORES["suave"],
+                                   font=tema.fuente(9))
+        self.lbl_previa.pack(expand=True)
+        datos_foto = tk.Frame(foto, bg=COLORES["tarjeta"])
+        datos_foto.pack(side="left", fill="x", expand=True, padx=(12, 0))
+        etiqueta_campo(datos_foto, "Foto (PNG o GIF)").pack(anchor="w")
+        self.foto = tk.StringVar()
+        ttk.Entry(datos_foto, textvariable=self.foto).pack(fill="x", pady=(2, 6))
+        ttk.Button(datos_foto, text="Elegir imagen…", command=self.elegir_foto).pack(anchor="w")
+        self.foto.trace_add("write", lambda *_args: self._mostrar_vista_previa())
 
         self.tipo = tk.StringVar(value="Polera")
+        etiqueta_campo(panel, "Tipo de prenda").grid(row=2, column=0, columnspan=2, sticky="w")
+        tipos = tk.Frame(panel, bg=COLORES["tarjeta"])
+        tipos.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(2, 8))
+        self._botones_tipo = []
+        for tipo in self.controlador.tipos_producto():
+            boton = ttk.Radiobutton(tipos, text=tipo, value=tipo, variable=self.tipo, style="Segmento.Toolbutton",
+                                    command=self._actualizar_tipo)
+            boton.pack(side="left", fill="x", expand=True, padx=(0, 4))
+            self._botones_tipo.append(boton)
+
         self.sku = tk.StringVar()
         self.nombre = tk.StringVar()
         self.talla = tk.StringVar()
         self.color = tk.StringVar()
         self.extra = tk.StringVar()
-        self.foto = tk.StringVar()
         self.stock = tk.StringVar(value="0")
 
-        ttk.Label(formulario, text="Tipo").grid(row=0, column=0, sticky="w", pady=4)
-        self.tipo_combo = ttk.Combobox(
-            formulario, textvariable=self.tipo, values=controlador.tipos_producto(), state="readonly", width=14
-        )
-        self.tipo_combo.grid(row=0, column=1, sticky="ew", padx=(8, 16), pady=4)
-        self.tipo_combo.bind("<<ComboboxSelected>>", lambda _evento: self._actualizar_tipo())
+        etiqueta_campo(panel, "SKU").grid(row=4, column=0, sticky="w")
+        etiqueta_campo(panel, "Talla").grid(row=4, column=1, sticky="w", padx=(8, 0))
+        self.sku_entry = ttk.Entry(panel, textvariable=self.sku)
+        self.sku_entry.grid(row=5, column=0, sticky="ew", pady=(2, 8))
+        self.talla_combo = ttk.Combobox(panel, textvariable=self.talla, state="readonly", width=8)
+        self.talla_combo.grid(row=5, column=1, sticky="ew", padx=(8, 0), pady=(2, 8))
 
-        ttk.Label(formulario, text="SKU").grid(row=0, column=2, sticky="w", pady=4)
-        self.sku_entry = ttk.Entry(formulario, textvariable=self.sku)
-        self.sku_entry.grid(row=0, column=3, sticky="ew", padx=(8, 0), pady=4)
+        etiqueta_campo(panel, "Nombre").grid(row=6, column=0, columnspan=2, sticky="w")
+        ttk.Entry(panel, textvariable=self.nombre).grid(row=7, column=0, columnspan=2, sticky="ew", pady=(2, 8))
 
-        ttk.Label(formulario, text="Nombre").grid(row=1, column=0, sticky="w", pady=4)
-        ttk.Entry(formulario, textvariable=self.nombre).grid(
-            row=1, column=1, columnspan=3, sticky="ew", padx=(8, 0), pady=4
-        )
+        etiqueta_campo(panel, "Color").grid(row=8, column=0, sticky="w")
+        self.lbl_extra = etiqueta_campo(panel, "Corte")
+        self.lbl_extra.grid(row=8, column=1, sticky="w", padx=(8, 0))
+        ttk.Entry(panel, textvariable=self.color).grid(row=9, column=0, sticky="ew", pady=(2, 8))
+        self.extra_combo = ttk.Combobox(panel, textvariable=self.extra, state="readonly", width=10)
+        self.extra_combo.grid(row=9, column=1, sticky="ew", padx=(8, 0), pady=(2, 8))
 
-        ttk.Label(formulario, text="Talla").grid(row=2, column=0, sticky="w", pady=4)
-        self.talla_combo = ttk.Combobox(formulario, textvariable=self.talla, state="readonly", width=14)
-        self.talla_combo.grid(row=2, column=1, sticky="ew", padx=(8, 16), pady=4)
-        ttk.Label(formulario, text="Color").grid(row=2, column=2, sticky="w", pady=4)
-        ttk.Entry(formulario, textvariable=self.color).grid(row=2, column=3, sticky="ew", padx=(8, 0), pady=4)
+        self.lbl_stock = etiqueta_campo(panel, "Stock inicial")
+        self.lbl_stock.grid(row=10, column=0, sticky="w")
+        self.stock_entry = ttk.Entry(panel, textvariable=self.stock)
+        self.stock_entry.grid(row=11, column=0, sticky="ew", pady=(2, 8))
+        self.lbl_disponible = ttk.Label(panel, style="Ayuda.TLabel", wraplength=120, justify="left")
+        self.lbl_disponible.grid(row=11, column=1, sticky="w", padx=(8, 0))
 
-        self.lbl_extra = ttk.Label(formulario, text="Corte")
-        self.lbl_extra.grid(row=3, column=0, sticky="w", pady=4)
-        self.extra_combo = ttk.Combobox(formulario, textvariable=self.extra, state="readonly", width=14)
-        self.extra_combo.grid(row=3, column=1, sticky="ew", padx=(8, 16), pady=4)
-        self.lbl_stock = ttk.Label(formulario, text="Stock inicial")
-        self.lbl_stock.grid(row=3, column=2, sticky="w", pady=4)
-        self.stock_entry = ttk.Entry(formulario, textvariable=self.stock)
-        self.stock_entry.grid(row=3, column=3, sticky="ew", padx=(8, 0), pady=4)
+        acciones = tk.Frame(panel, bg=COLORES["tarjeta"])
+        acciones.grid(row=12, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        self.boton_registrar = ttk.Button(acciones, text="Registrar prenda", style="Primario.TButton",
+                                          command=self.registrar)
+        self.boton_guardar = ttk.Button(acciones, text="Guardar cambios", style="Primario.TButton",
+                                        command=self.guardar)
+        self.boton_limpiar = ttk.Button(acciones, text="Cancelar", command=self.limpiar)
+        self.boton_eliminar = ttk.Button(acciones, text="Eliminar", style="Peligro.TButton", command=self.eliminar)
+        self.boton_registrar.pack(side="left")
+        self.boton_guardar.pack(side="left")
+        self.boton_limpiar.pack(side="left", padx=6)
+        self.boton_eliminar.pack(side="right")
 
-        ttk.Label(formulario, text="Foto").grid(row=4, column=0, sticky="w", pady=4)
-        ttk.Entry(formulario, textvariable=self.foto).grid(
-            row=4, column=1, columnspan=2, sticky="ew", padx=(8, 8), pady=4
-        )
-        ttk.Button(formulario, text="Elegir imagen…", command=self.elegir_foto).grid(row=4, column=3, sticky="w")
-        self.foto.trace_add("write", lambda *_args: self._mostrar_vista_previa())
-        formulario.columnconfigure(1, weight=1)
-        formulario.columnconfigure(3, weight=1)
-
-        acciones = ttk.Frame(formulario)
-        acciones.grid(row=5, column=0, columnspan=4, sticky="e", pady=(12, 0))
-        self.boton_registrar = ttk.Button(acciones, text="Registrar", command=self.registrar)
-        self.boton_guardar = ttk.Button(acciones, text="Guardar cambios", command=self.guardar)
-        self.boton_eliminar = ttk.Button(acciones, text="Eliminar", command=self.eliminar)
-        self.boton_limpiar = ttk.Button(acciones, text="Limpiar", command=self.limpiar)
-        for boton in (self.boton_registrar, self.boton_guardar, self.boton_eliminar, self.boton_limpiar):
-            boton.pack(side="left", padx=(0, 8))
-
-        lateral = ttk.Frame(superior, padding=(12, 0, 0, 0))
-        lateral.pack(side="left", fill="y")
-        previa = ttk.LabelFrame(lateral, text="Vista previa", padding=8)
-        previa.pack(fill="x")
-        self.lbl_previa = ttk.Label(previa, text="Sin foto", anchor="center", width=22)
-        self.lbl_previa.pack(ipady=40)
-
-        ingreso = ttk.LabelFrame(lateral, text="Ingreso a bodega", padding=8)
-        ingreso.pack(fill="x", pady=(12, 0))
+        self.zona_ingreso = tk.Frame(panel, bg=COLORES["tarjeta"])
+        self.zona_ingreso.grid(row=13, column=0, columnspan=2, sticky="ew")
+        separador(self.zona_ingreso, pady=(14, 10))
+        etiqueta_campo(self.zona_ingreso, "Llegó mercadería: ingresar unidades a bodega").pack(anchor="w")
+        linea = tk.Frame(self.zona_ingreso, bg=COLORES["tarjeta"])
+        linea.pack(fill="x", pady=(4, 0))
         self.cantidad_ingreso = tk.StringVar(value="1")
-        ttk.Label(ingreso, text="Unidades").grid(row=0, column=0, sticky="w")
-        ttk.Entry(ingreso, textvariable=self.cantidad_ingreso, width=8).grid(row=0, column=1, padx=6)
-        self.boton_ingresar = ttk.Button(ingreso, text="Ingresar", command=self.ingresar)
-        self.boton_ingresar.grid(row=0, column=2)
+        ttk.Spinbox(linea, from_=1, to=9999, textvariable=self.cantidad_ingreso, width=8).pack(side="left")
+        self.boton_ingresar = ttk.Button(linea, text="Ingresar unidades", command=self.ingresar)
+        self.boton_ingresar.pack(side="left", padx=8)
 
-        ttk.Label(
-            self,
-            text="Disponible = stock en bodega menos lo reservado en órdenes en borrador.",
-        ).pack(anchor="w", pady=(12, 4))
-        marco, self.tabla = crear_tabla(
-            self,
-            ("sku", "tipo", "nombre", "talla", "color", "detalle", "stock", "disponible", "estado"),
-            ("SKU", "Tipo", "Nombre", "Talla", "Color", "Atributo especial", "Stock", "Disponible", "Estado"),
-            (120, 80, 170, 55, 80, 120, 60, 80, 90),
-            altura=5,
-            con_imagen=True,
-        )
-        marco.pack(fill="both", expand=True)
-        self.tabla.tag_configure("agotado", foreground="#a33a2b")
-        self.tabla.bind("<<TreeviewSelect>>", self.al_seleccionar)
-        self.limpiar()
+    @staticmethod
+    def _marcador(entrada: ttk.Entry, texto: str) -> None:
+        """Texto gris de ayuda dentro del buscador (placeholder)."""
+        variable_nombre = entrada.cget("textvariable")
+        etiqueta = tk.Label(entrada, text=texto, bg=COLORES["tarjeta"], fg="#9aa1ac", font=tema.fuente(10))
+
+        def actualizar(*_args):
+            if entrada.getvar(variable_nombre) or entrada.focus_get() is entrada:
+                etiqueta.place_forget()
+            else:
+                etiqueta.place(x=8, rely=0.5, anchor="w")
+
+        etiqueta.bind("<Button-1>", lambda _e: entrada.focus_set())
+        entrada.bind("<FocusIn>", actualizar, add="+")
+        entrada.bind("<FocusOut>", actualizar, add="+")
+        entrada.after(50, actualizar)
 
     # ----- Formulario -----
 
@@ -136,15 +205,15 @@ class Productos(Pantalla):
             if self.extra.get() not in opciones:
                 self.extra.set(opciones[0])
         else:
-            self.lbl_extra.configure(text="(sin atributo extra)")
+            self.lbl_extra.configure(text="Sin atributo extra")
             self.extra.set("")
             self.extra_combo.configure(values=(), state="disabled")
 
     def _mostrar_vista_previa(self) -> None:
-        imagen = cargar_miniatura(self.controlador.ruta_foto(self.foto.get().strip()), 150)
+        imagen = cargar_miniatura(self.controlador.ruta_foto(self.foto.get().strip()), 92)
         self._vista_previa = imagen
         if imagen is None:
-            self.lbl_previa.configure(image="", text="Sin foto\n(PNG o GIF)")
+            self.lbl_previa.configure(image="", text="Sin\nfoto")
         else:
             self.lbl_previa.configure(image=imagen, text="")
 
@@ -159,31 +228,43 @@ class Productos(Pantalla):
             self.foto.set(self.controlador.foto_relativa(ruta))
 
     def refrescar(self) -> None:
+        self._llenar_tabla()
+        if self._sku:
+            self.seleccionar(self._sku)
+
+    def _llenar_tabla(self) -> None:
+        texto = self.busqueda.get()
+        productos = self.controlador.buscar_productos(texto, self.filtro.get())
+        total = len(self.controlador.listar_productos())
         self.tabla.delete(*self.tabla.get_children())
         self._miniaturas.clear()
-        for producto in self.controlador.listar_productos():
-            imagen = cargar_miniatura(self.controlador.ruta_foto(producto.foto), 52)
+        for producto in productos:
+            imagen = cargar_miniatura(self.controlador.ruta_foto(producto.foto), 48)
             opciones = {"image": imagen} if imagen else {"text": "—"}
             if imagen:
                 self._miniaturas[producto.sku] = imagen
-            self.tabla.insert(
-                "",
-                "end",
-                iid=producto.sku,
-                values=(
-                    producto.sku,
-                    producto.tipo_visible,
-                    producto.nombre,
-                    producto.talla,
-                    producto.color,
-                    producto.detalle or "—",
-                    producto.stock,
-                    self.controlador.stock_disponible(producto.sku),
-                    producto.estado.etiqueta,
-                ),
-                tags=() if producto.disponible else ("agotado",),
+            estado, tipo = chip_estado_producto(producto)
+            nombre = producto.nombre
+            fila(
+                self.tabla,
+                producto.sku,
+                (producto.sku, nombre, producto.talla, producto.color, producto.stock, f"●  {estado}"),
+                tags=(tipo,) if tipo != "exito" else (),
                 **opciones,
             )
+        self.contador.configure(text=f"Mostrando {len(productos)} de {total} prendas")
+        if self._sku and self.tabla.exists(self._sku):
+            self.tabla.selection_set(self._sku)
+
+    def seleccionar(self, sku: str) -> None:
+        if not self.tabla.exists(sku):
+            self.busqueda.set("")
+            self.filtro.set("Todos")
+            self._llenar_tabla()
+        if self.tabla.exists(sku):
+            self.tabla.selection_set(sku)
+            self.tabla.see(sku)
+            self.al_seleccionar()
 
     def al_seleccionar(self, _evento=None) -> None:
         seleccion = self.tabla.selection()
@@ -200,14 +281,23 @@ class Productos(Pantalla):
         self.extra.set(getattr(producto, "corte", getattr(producto, "estilo", "")))
         self.foto.set(producto.foto)
         self.stock.set(str(producto.stock))
-        self.tipo_combo.configure(state="disabled")
-        self.sku_entry.configure(state="disabled")
-        self.stock_entry.configure(state="disabled")
+        for boton in self._botones_tipo:
+            boton.state(["disabled"])
+        self.sku_entry.state(["disabled"])
+        self.stock_entry.state(["disabled"])
+        self.lbl_panel.configure(text="Ficha de la prenda")
         self.lbl_stock.configure(text="Stock actual")
-        self.boton_registrar.configure(state="disabled")
-        self.boton_guardar.configure(state="normal")
-        self.boton_eliminar.configure(state="normal")
-        self.boton_ingresar.configure(state="normal")
+        estado, tipo = chip_estado_producto(producto)
+        pintar_chip(self.chip_estado, estado, tipo)
+        self.chip_estado.pack(side="right")
+        self.lbl_disponible.configure(
+            text=f"Libre para traslado:\n{self.controlador.stock_disponible(producto.sku)} unidades"
+        )
+        self.boton_registrar.pack_forget()
+        self.boton_guardar.pack(side="left", before=self.boton_limpiar)
+        self.boton_eliminar.pack(side="right")
+        self.boton_ingresar.state(["!disabled"])
+        self.zona_ingreso.grid()
 
     def limpiar(self) -> None:
         self._sku = None
@@ -216,15 +306,20 @@ class Productos(Pantalla):
         self.stock.set("0")
         self.tipo.set("Polera")
         self.talla.set("")
-        self.tipo_combo.configure(state="readonly")
-        self.sku_entry.configure(state="normal")
-        self.stock_entry.configure(state="normal")
+        for boton in self._botones_tipo:
+            boton.state(["!disabled"])
+        self.sku_entry.state(["!disabled"])
+        self.stock_entry.state(["!disabled"])
+        self.lbl_panel.configure(text="Nueva prenda")
         self.lbl_stock.configure(text="Stock inicial")
+        self.lbl_disponible.configure(text="")
+        self.chip_estado.pack_forget()
         self._actualizar_tipo()
-        self.boton_registrar.configure(state="normal")
-        self.boton_guardar.configure(state="disabled")
-        self.boton_eliminar.configure(state="disabled")
-        self.boton_ingresar.configure(state="disabled")
+        self.boton_guardar.pack_forget()
+        self.boton_registrar.pack(side="left", before=self.boton_limpiar)
+        self.boton_eliminar.pack_forget()
+        self.boton_ingresar.state(["disabled"])
+        self.zona_ingreso.grid_remove()
         if self.tabla.selection():
             self.tabla.selection_remove(self.tabla.selection())
 
@@ -245,28 +340,28 @@ class Productos(Pantalla):
         )
         if not ok:
             return
-        informar(self.winfo_toplevel(), "Producto registrado", f"{producto.sku} quedó en la bodega.")
+        informar(self.winfo_toplevel(), "Prenda registrada", f"{producto.sku} quedó en la bodega.")
         self.limpiar()
-        self.refrescar()
+        self._llenar_tabla()
 
     def guardar(self) -> None:
         if not self._sku:
-            mostrar_error(self.winfo_toplevel(), "Selecciona un producto de la tabla para editarlo.")
+            mostrar_error(self.winfo_toplevel(), "Selecciona una prenda de la tabla para editarla.")
             return
-        ok, _producto = self.ejecutar(
+        ok, producto = self.ejecutar(
             lambda: self.controlador.editar_producto(
                 self._sku, self.nombre.get(), self.foto.get(), self.talla.get(), self.color.get(), self.extra.get()
             )
         )
         if not ok:
             return
-        informar(self.winfo_toplevel(), "Producto actualizado", "Los cambios quedaron guardados.")
-        self.limpiar()
-        self.refrescar()
+        informar(self.winfo_toplevel(), "Cambios guardados", f"La ficha de {producto.sku} quedó actualizada.")
+        self._llenar_tabla()
+        self.seleccionar(producto.sku)
 
     def ingresar(self) -> None:
         if not self._sku:
-            mostrar_error(self.winfo_toplevel(), "Selecciona el producto que recibe unidades.")
+            mostrar_error(self.winfo_toplevel(), "Selecciona la prenda que recibe unidades.")
             return
         sku = self._sku
         ok, producto = self.ejecutar(lambda: self.controlador.ingresar_stock(sku, self.cantidad_ingreso.get()))
@@ -275,22 +370,21 @@ class Productos(Pantalla):
         informar(
             self.winfo_toplevel(),
             "Ingreso registrado",
-            f"{producto.sku}: stock {producto.stock} · {producto.estado.etiqueta}.",
+            f"{producto.sku}: ahora hay {producto.stock} unidades ({producto.estado.etiqueta}).",
         )
         self.cantidad_ingreso.set("1")
-        self.refrescar()
-        self.tabla.selection_set(sku)
-        self.al_seleccionar()
+        self._llenar_tabla()
+        self.seleccionar(sku)
 
     def eliminar(self) -> None:
         if not self._sku:
-            mostrar_error(self.winfo_toplevel(), "Selecciona un producto de la tabla para eliminarlo.")
+            mostrar_error(self.winfo_toplevel(), "Selecciona una prenda de la tabla para eliminarla.")
             return
-        if not pedir_confirmacion(self.winfo_toplevel(), "Eliminar producto", f"¿Eliminar {self._sku}?"):
+        if not pedir_confirmacion(self.winfo_toplevel(), "Eliminar prenda", f"¿Eliminar {self._sku} del catálogo?"):
             return
         ok, _resultado = self.ejecutar(lambda: self.controlador.eliminar_producto(self._sku))
         if not ok:
             return
-        informar(self.winfo_toplevel(), "Producto eliminado", "El producto salió del catálogo.")
+        informar(self.winfo_toplevel(), "Prenda eliminada", "La prenda salió del catálogo.")
         self.limpiar()
-        self.refrescar()
+        self._llenar_tabla()

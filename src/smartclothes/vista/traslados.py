@@ -1,19 +1,81 @@
-"""Creación de órdenes de traslado, carga de prendas por SKU y confirmación."""
+"""Órdenes de traslado en tres pasos: prendas, transporte y confirmación."""
 
 import tkinter as tk
 from datetime import date
 from tkinter import ttk
 
 from smartclothes.modelo.errores import ReglaNegocioError
+from smartclothes.vista import tema
 from smartclothes.vista.comun import (
+    COLORES,
+    ComboBuscador,
     Pantalla,
+    Tarjeta,
+    chip,
     configurar_combo,
     crear_tabla,
+    encabezado,
+    etiqueta_campo,
+    fila,
     informar,
     mostrar_error,
     pedir_confirmacion,
-    titulo,
+    pintar_chip,
+    separador,
 )
+
+TIPO_ESTADO = {"Borrador": "aviso", "Confirmada": "exito", "Anulada": "neutro"}
+TAG_ESTADO = {"Borrador": ("aviso",), "Confirmada": ("exito",), "Anulada": ("suave",)}
+
+
+class TarjetaCamion(tk.Frame):
+    """Opción de transporte que se elige con un clic. Muestra costo y ocupación."""
+
+    def __init__(self, master, datos: dict, al_elegir):
+        super().__init__(master, bg=COLORES["tarjeta"], highlightthickness=2,
+                         highlightbackground=COLORES["borde"], padx=14, pady=10)
+        self.nombre = datos["nombre"]
+        self.apto = datos["apto"]
+        fondo = COLORES["tarjeta"] if self.apto else COLORES["zebra"]
+        texto = COLORES["texto"] if self.apto else COLORES["suave"]
+        self.configure(bg=fondo, cursor="hand2" if self.apto else "arrow")
+
+        cabeza = tk.Frame(self, bg=fondo)
+        cabeza.pack(fill="x")
+        self._radio = tk.Label(cabeza, text="○", bg=fondo, fg=COLORES["suave"], font=tema.fuente(13))
+        self._radio.pack(side="left")
+        tk.Label(cabeza, text=self.nombre, bg=fondo, fg=texto, font=tema.fuente(10, "bold")).pack(
+            side="left", padx=(6, 0)
+        )
+        if datos["sugerido"]:
+            chip(cabeza, "Sugerido", "acento").pack(side="right")
+        tk.Label(self, text=datos["descripcion"].split(": ", 1)[-1].capitalize(), bg=fondo, fg=COLORES["suave"],
+                 font=tema.fuente(9)).pack(anchor="w", pady=(2, 6))
+        if self.apto:
+            tk.Label(self, text=datos["costo"], bg=fondo, fg=COLORES["texto"], font=tema.fuente(16, "bold")).pack(
+                anchor="w"
+            )
+            barra = ttk.Progressbar(self, style="Ocupacion.Horizontal.TProgressbar", maximum=100,
+                                    value=max(datos["ocupacion"], 2))
+            barra.pack(fill="x", pady=(6, 2))
+            tk.Label(self, text=f"Camión ocupado al {datos['ocupacion']}%", bg=fondo, fg=COLORES["suave"],
+                     font=tema.fuente(9)).pack(anchor="w")
+        else:
+            tk.Label(self, text="No sirve para esta carga", bg=fondo, fg=COLORES["peligro"],
+                     font=tema.fuente(10, "bold")).pack(anchor="w")
+            tk.Label(self, text=datos["motivo"].capitalize(), bg=fondo, fg=COLORES["suave"], font=tema.fuente(9),
+                     wraplength=230, justify="left").pack(anchor="w", pady=(2, 0))
+        if self.apto:
+            self._enlazar(self, lambda _e: al_elegir(self.nombre))
+
+    def _enlazar(self, widget, accion) -> None:
+        widget.bind("<Button-1>", accion)
+        for hijo in widget.winfo_children():
+            self._enlazar(hijo, accion)
+
+    def marcar(self, elegido: bool) -> None:
+        self.configure(highlightbackground=COLORES["acento"] if elegido else COLORES["borde"])
+        self._radio.configure(text="◉" if elegido else "○", fg=COLORES["acento"] if elegido else COLORES["suave"])
 
 
 class Traslados(Pantalla):
@@ -22,99 +84,146 @@ class Traslados(Pantalla):
         self._ver_comprobante = ver_comprobante
         self._tiendas: dict[str, str] = {}
         self._folio: str | None = None
-        titulo(self, "Órdenes de traslado")
+        self._tarjetas_camion: list[TarjetaCamion] = []
+        encabezado(self, "Órdenes de traslado", "Envía prendas de la bodega a una tienda en tres pasos.")
 
-        alta = ttk.LabelFrame(self, text="Nueva orden", padding=12)
-        alta.pack(fill="x")
+        cuerpo = ttk.Frame(self)
+        cuerpo.pack(fill="both", expand=True)
+        cuerpo.columnconfigure(1, weight=1)
+        cuerpo.rowconfigure(0, weight=1)
+        self._crear_lista(cuerpo)
+        self._crear_detalle(cuerpo)
+
+    # ----- Columna izquierda: nueva orden y listado -----
+
+    def _crear_lista(self, cuerpo) -> None:
+        izquierda = Tarjeta(cuerpo, width=330)
+        izquierda.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
+        izquierda.pack_propagate(False)
+        ttk.Label(izquierda, text="Nueva orden", style="Seccion.TLabel").pack(anchor="w")
         self.tienda = tk.StringVar()
         self.fecha = tk.StringVar(value=date.today().strftime("%d-%m-%Y"))
-        ttk.Label(alta, text="Tienda destino").grid(row=0, column=0, sticky="w")
-        self.combo_tienda = ttk.Combobox(alta, textvariable=self.tienda, state="readonly")
-        self.combo_tienda.grid(row=0, column=1, sticky="ew", padx=8)
-        ttk.Label(alta, text="Fecha de despacho (dd-mm-aaaa)").grid(row=0, column=2, sticky="w")
-        ttk.Entry(alta, textvariable=self.fecha, width=12).grid(row=0, column=3, padx=8)
-        ttk.Button(alta, text="Crear orden", command=self.crear).grid(row=0, column=4)
-        alta.columnconfigure(1, weight=1)
-
+        etiqueta_campo(izquierda, "Tienda destino").pack(anchor="w", pady=(10, 2))
+        self.combo_tienda = ttk.Combobox(izquierda, textvariable=self.tienda, state="readonly")
+        self.combo_tienda.pack(fill="x")
+        etiqueta_campo(izquierda, "Fecha de despacho (dd-mm-aaaa)").pack(anchor="w", pady=(8, 2))
+        fecha = tk.Frame(izquierda, bg=COLORES["tarjeta"])
+        fecha.pack(fill="x")
+        ttk.Entry(fecha, textvariable=self.fecha, width=14).pack(side="left")
+        ttk.Button(fecha, text="Crear orden", style="Primario.TButton", command=self.crear).pack(side="right")
+        separador(izquierda, pady=(16, 12))
+        ttk.Label(izquierda, text="Órdenes", style="Seccion.TLabel").pack(anchor="w", pady=(0, 6))
         marco, self.tabla = crear_tabla(
-            self,
-            ("folio", "fecha", "tienda", "estado", "unidades"),
-            ("Folio", "Despacho", "Tienda destino", "Estado", "Unidades"),
-            (110, 100, 280, 110, 90),
-            altura=4,
+            izquierda, ("folio", "tienda", "estado"), ("Folio", "Tienda", "Estado"), (88, 92, 92), altura=8
         )
-        marco.pack(fill="both", expand=True, pady=12)
+        marco.pack(fill="both", expand=True)
         self.tabla.bind("<<TreeviewSelect>>", self.al_seleccionar)
 
-        edicion = ttk.LabelFrame(self, text="Prendas de la orden seleccionada", padding=12)
-        edicion.pack(fill="both", expand=True)
+    # ----- Columna derecha: detalle de la orden -----
+
+    def _crear_detalle(self, cuerpo) -> None:
+        self.panel = Tarjeta(cuerpo, padding=20)
+        self.panel.grid(row=0, column=1, sticky="nsew")
+
+        self.vacio = tk.Frame(self.panel, bg=COLORES["tarjeta"])
+        tk.Label(self.vacio, text="⇄", bg=COLORES["tarjeta"], fg=COLORES["borde"], font=tema.fuente(48)).pack(
+            pady=(80, 4)
+        )
+        tk.Label(self.vacio, text="Ninguna orden seleccionada", bg=COLORES["tarjeta"],
+                 font=tema.fuente(13, "bold")).pack()
+        tk.Label(self.vacio, text="Crea una orden a la izquierda o elige una del listado.", bg=COLORES["tarjeta"],
+                 fg=COLORES["suave"]).pack(pady=(4, 0))
+
+        self.detalle = tk.Frame(self.panel, bg=COLORES["tarjeta"])
+        cabeza = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
+        cabeza.pack(fill="x")
+        self.lbl_folio = ttk.Label(cabeza, style="Grande.TLabel")
+        self.lbl_folio.pack(side="left")
+        self.chip_estado = chip(cabeza, "", "neutro")
+        self.chip_estado.pack(side="left", padx=10)
+        self.boton_anular = ttk.Button(cabeza, text="Anular orden", style="Peligro.TButton", command=self.anular)
+        self.boton_anular.pack(side="right")
+        self.lbl_destino = ttk.Label(self.detalle, style="Ayuda.TLabel")
+        self.lbl_destino.pack(anchor="w", pady=(2, 10))
+
+        self.pasos = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
+        self.pasos.pack(fill="x", pady=(0, 12))
+        self._etiquetas_paso = []
+        for indice, texto in enumerate(("Prendas", "Transporte", "Confirmar"), start=1):
+            numero = tk.Label(self.pasos, text=str(indice), width=2, font=tema.fuente(9, "bold"))
+            numero.pack(side="left")
+            nombre = tk.Label(self.pasos, text=texto, bg=COLORES["tarjeta"], font=tema.fuente(10, "bold"))
+            nombre.pack(side="left", padx=(6, 0))
+            if indice < 3:
+                tk.Frame(self.pasos, bg=COLORES["borde"], height=2, width=60).pack(side="left", padx=12)
+            self._etiquetas_paso.append((numero, nombre))
+
+        # Paso 1: prendas
+        self.zona_agregar = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
+        self.zona_agregar.pack(fill="x")
         self.sku = tk.StringVar()
         self.cantidad = tk.StringVar(value="1")
-        ttk.Label(edicion, text="SKU").grid(row=0, column=0, sticky="w")
-        self.combo_sku = ttk.Combobox(edicion, textvariable=self.sku, width=18)
-        self.combo_sku.grid(row=0, column=1, sticky="w", padx=8)
-        self.combo_sku.bind("<<ComboboxSelected>>", lambda _evento: self._describir_sku())
-        self.combo_sku.bind("<KeyRelease>", lambda _evento: self._describir_sku())
-        ttk.Label(edicion, text="Cantidad").grid(row=0, column=2, sticky="w")
-        ttk.Entry(edicion, textvariable=self.cantidad, width=8).grid(row=0, column=3, padx=8)
-        self.boton_agregar = ttk.Button(edicion, text="Agregar", command=self.agregar)
-        self.boton_quitar = ttk.Button(edicion, text="Quitar línea", command=self.quitar)
-        self.boton_agregar.grid(row=0, column=4, padx=(0, 8))
-        self.boton_quitar.grid(row=0, column=5)
-        self.info_sku = ttk.Label(edicion, foreground="#5a4a3a")
-        self.info_sku.grid(row=1, column=0, columnspan=6, sticky="w", pady=(6, 0))
+        etiqueta_campo(self.zona_agregar, "SKU de la prenda").grid(row=0, column=0, sticky="w")
+        etiqueta_campo(self.zona_agregar, "Cantidad").grid(row=0, column=1, sticky="w", padx=(10, 0))
+        self.combo_sku = ComboBuscador(self.zona_agregar, textvariable=self.sku, width=22)
+        self.combo_sku.grid(row=1, column=0, sticky="w", pady=(2, 0))
+        self.combo_sku.bind("<<ComboboxSelected>>", lambda _e: self._describir_sku())
+        self.combo_sku.bind("<KeyRelease>", lambda _e: self._describir_sku(), add="+")
+        self.combo_sku.bind("<Return>", lambda _e: self.agregar())
+        self.entrada_cantidad = ttk.Spinbox(self.zona_agregar, from_=1, to=9999, textvariable=self.cantidad, width=7)
+        self.entrada_cantidad.grid(row=1, column=1, padx=(10, 0), pady=(2, 0))
+        self.entrada_cantidad.bind("<Return>", lambda _e: self.agregar())
+        self.boton_agregar = ttk.Button(self.zona_agregar, text="+ Agregar", command=self.agregar)
+        self.boton_agregar.grid(row=1, column=2, padx=(10, 0), pady=(2, 0))
+        self.info_sku = ttk.Label(self.zona_agregar, style="Ayuda.TLabel")
+        self.info_sku.grid(row=2, column=0, columnspan=4, sticky="w", pady=(4, 0))
 
-        marco_lineas, self.lineas = crear_tabla(
-            edicion,
+        marco, self.lineas = crear_tabla(
+            self.detalle,
             ("sku", "nombre", "talla", "color", "cantidad"),
-            ("SKU", "Nombre", "Talla", "Color", "Cantidad"),
-            (140, 240, 70, 110, 90),
+            ("SKU", "Prenda", "Talla", "Color", "Cantidad"),
+            (130, 170, 55, 90, 75),
             altura=4,
         )
-        marco_lineas.grid(row=2, column=0, columnspan=6, sticky="nsew", pady=(8, 0))
-        edicion.rowconfigure(2, weight=1)
-        edicion.columnconfigure(6, weight=1)
+        marco.pack(fill="both", expand=True, pady=(8, 0))
+        pie_lineas = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
+        pie_lineas.pack(fill="x")
+        self.boton_quitar = ttk.Button(pie_lineas, text="Quitar la línea seleccionada", style="Enlace.TButton",
+                                       command=self.quitar)
+        self.boton_quitar.pack(side="left", pady=(4, 0))
+        self.lbl_unidades = ttk.Label(pie_lineas, style="Ayuda.TLabel")
+        self.lbl_unidades.pack(side="right", pady=(4, 0))
 
-        despacho = ttk.LabelFrame(edicion, text="Despacho", padding=8)
-        despacho.grid(row=3, column=0, columnspan=7, sticky="ew", pady=(8, 0))
+        # Paso 2: transporte
+        ttk.Label(self.detalle, text="Transporte", style="Seccion.TLabel").pack(anchor="w", pady=(12, 6))
         self.transporte = tk.StringVar()
-        ttk.Label(despacho, text="Transporte").grid(row=0, column=0, sticky="w")
-        self.combo_transporte = ttk.Combobox(
-            despacho, textvariable=self.transporte, values=controlador.transportes(), state="readonly", width=24
-        )
-        self.combo_transporte.grid(row=0, column=1, sticky="w", padx=8)
-        self.cotizacion = ttk.Label(despacho, justify="left", foreground="#5a4a3a")
-        self.cotizacion.grid(row=0, column=2, sticky="w", padx=(8, 0))
+        self.zona_camiones = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
+        self.zona_camiones.pack(fill="x")
 
-        pie = ttk.Frame(edicion)
-        pie.grid(row=4, column=0, columnspan=7, sticky="ew", pady=(8, 0))
-        self.totales = ttk.Label(pie)
+        # Paso 3: confirmar
+        pie = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
+        pie.pack(fill="x", pady=(14, 0))
+        self.totales = ttk.Label(pie, style="Tarjeta.TLabel")
         self.totales.pack(side="left")
-        self.boton_anular = ttk.Button(pie, text="Anular orden", command=self.anular)
-        self.boton_confirmar = ttk.Button(pie, text="Confirmar y emitir comprobante", command=self.confirmar)
-        self.boton_anular.pack(side="right")
-        self.boton_confirmar.pack(side="right", padx=8)
+        self.boton_confirmar = ttk.Button(pie, text="Confirmar traslado  ›", style="Primario.TButton",
+                                          command=self.confirmar)
+        self.boton_confirmar.pack(side="right")
+        self.boton_comprobante = ttk.Button(pie, text="Ver comprobante  ›", style="Primario.TButton",
+                                            command=lambda: self._ver_comprobante(self._folio))
+
+    # ----- Datos -----
 
     def refrescar(self) -> None:
         self._tiendas = {tienda.identificacion: tienda.codigo for tienda in self.controlador.listar_tiendas()}
         configurar_combo(self.combo_tienda, list(self._tiendas), self.tienda.get())
-        self.combo_sku["values"] = [producto.sku for producto in self.controlador.listar_productos()]
+        self.combo_sku.opciones([producto.sku for producto in self.controlador.listar_productos()])
 
         seleccionado = self._folio
         self.tabla.delete(*self.tabla.get_children())
         for orden in reversed(self.controlador.listar_ordenes()):
-            self.tabla.insert(
-                "",
-                "end",
-                iid=orden.folio,
-                values=(
-                    orden.folio,
-                    orden.fecha_texto,
-                    self.controlador.nombre_tienda(orden.tienda_codigo),
-                    orden.estado.etiqueta,
-                    orden.unidades,
-                ),
-            )
+            tienda = self.controlador.nombre_tienda(orden.tienda_codigo).split(" — ")[0]
+            etiqueta = orden.estado.etiqueta
+            fila(self.tabla, orden.folio, (orden.folio, tienda, etiqueta), tags=TAG_ESTADO.get(etiqueta, ()))
         if seleccionado and self.tabla.exists(seleccionado):
             self.tabla.selection_set(seleccionado)
             self.tabla.see(seleccionado)
@@ -127,20 +236,132 @@ class Traslados(Pantalla):
     def _describir_sku(self) -> None:
         texto = self.sku.get().strip()
         if not texto:
-            self.info_sku.configure(text="Escribe o elige un SKU.")
+            self.info_sku.configure(text="Escribe o elige un SKU. Enter para agregar.", foreground=COLORES["suave"])
             return
         try:
             producto = self.controlador.obtener_producto(texto)
         except ReglaNegocioError:
-            self.info_sku.configure(text="SKU no encontrado.")
+            self.info_sku.configure(text="SKU no encontrado.", foreground=COLORES["peligro"])
             return
+        disponible = self.controlador.stock_disponible(producto.sku)
         self.info_sku.configure(
-            text=(
-                f"{producto.descripcion()} — Stock {producto.stock} · "
-                f"Disponible para traslado {self.controlador.stock_disponible(producto.sku)} · "
-                f"{producto.estado.etiqueta}"
-            )
+            text=f"{producto.descripcion()}  ·  Disponible para traslado: {disponible}",
+            foreground=COLORES["peligro"] if disponible == 0 else COLORES["suave"],
         )
+
+    def al_seleccionar(self, _evento=None) -> None:
+        seleccion = self.tabla.selection()
+        nuevo = seleccion[0] if seleccion else None
+        if nuevo != self._folio:
+            self.transporte.set("")
+        self._folio = nuevo
+        self._mostrar(self._folio)
+
+    def _mostrar(self, folio: str | None) -> None:
+        if not folio:
+            self.detalle.pack_forget()
+            self.vacio.pack(fill="both", expand=True)
+            return
+        self.vacio.pack_forget()
+        self.detalle.pack(fill="both", expand=True)
+        orden = self.controlador.obtener_orden(folio)
+        acciones = self.controlador.acciones(folio)
+        estado = orden.estado.etiqueta
+
+        self.lbl_folio.configure(text=f"Orden {orden.folio}")
+        pintar_chip(self.chip_estado, estado, TIPO_ESTADO.get(estado, "neutro"))
+        self.lbl_destino.configure(
+            text=f"Para {self.controlador.nombre_tienda(orden.tienda_codigo)}  ·  Despacho {orden.fecha_texto}"
+        )
+
+        self.lineas.delete(*self.lineas.get_children())
+        for detalle in orden.detalles:
+            fila(self.lineas, detalle.sku, (detalle.sku, detalle.nombre, detalle.talla, detalle.color, detalle.cantidad))
+        lineas = len(orden.detalles)
+        self.lbl_unidades.configure(text=f"{lineas} línea{'s' if lineas != 1 else ''} · {orden.unidades} unidades")
+
+        editable = acciones["puede_editar_items"]
+        for widget in (self.combo_sku, self.entrada_cantidad, self.boton_agregar, self.boton_quitar):
+            widget.state(["!disabled"] if editable else ["disabled"])
+        self.boton_anular.state(["!disabled"] if acciones["puede_anular"] else ["disabled"])
+
+        self._mostrar_camiones(orden)
+        self._mostrar_pie(orden, acciones)
+
+    def _mostrar_camiones(self, orden) -> None:
+        for tarjeta in self._tarjetas_camion:
+            tarjeta.destroy()
+        self._tarjetas_camion = []
+        for hijo in self.zona_camiones.winfo_children():
+            hijo.destroy()
+        if orden.aplicada and orden.despacho is not None:
+            self.transporte.set(orden.despacho.nombre)
+            tk.Label(self.zona_camiones, text=f"✓  {orden.despacho.resumen()}", bg=COLORES["exito_suave"],
+                     fg=COLORES["exito"], font=tema.fuente(10, "bold"), padx=12, pady=8, anchor="w").pack(fill="x")
+            return
+        if not orden.detalles or orden.estado.etiqueta == "Anulada":
+            self.transporte.set("")
+            texto = "Esta orden fue anulada." if orden.estado.etiqueta == "Anulada" else (
+                "Agrega prendas para ver qué camión conviene.")
+            tk.Label(self.zona_camiones, text=texto, bg=COLORES["zebra"], fg=COLORES["suave"], padx=12, pady=10,
+                     anchor="w").pack(fill="x")
+            return
+        cotizaciones = self.controlador.cotizar_despachos(orden.folio)
+        nombres_aptos = [datos["nombre"] for datos in cotizaciones if datos["apto"]]
+        if self.transporte.get() not in nombres_aptos:
+            self.transporte.set(self.controlador.transporte_sugerido(orden.folio))
+        for columna, datos in enumerate(cotizaciones):
+            tarjeta = TarjetaCamion(self.zona_camiones, datos, self.elegir_transporte)
+            tarjeta.grid(row=0, column=columna, sticky="nsew", padx=(0 if columna == 0 else 12, 0))
+            self.zona_camiones.columnconfigure(columna, weight=1, uniform="camion")
+            self._tarjetas_camion.append(tarjeta)
+        self._marcar_camiones()
+
+    def elegir_transporte(self, nombre: str) -> None:
+        self.transporte.set(nombre)
+        self._marcar_camiones()
+        if self._folio:
+            self._mostrar_pie(self.controlador.obtener_orden(self._folio), self.controlador.acciones(self._folio))
+
+    def _marcar_camiones(self) -> None:
+        for tarjeta in self._tarjetas_camion:
+            tarjeta.marcar(tarjeta.nombre == self.transporte.get())
+
+    def _mostrar_pie(self, orden, acciones) -> None:
+        confirmada = acciones["tiene_comprobante"]
+        con_lineas = bool(orden.detalles)
+        con_camion = bool(self.transporte.get())
+        self._pintar_pasos((con_lineas or confirmada, (con_lineas and con_camion) or confirmada, confirmada))
+        if confirmada:
+            self.boton_confirmar.pack_forget()
+            self.boton_comprobante.pack(side="right")
+            self.totales.configure(text=f"Despachada · {orden.unidades} unidades", foreground=COLORES["exito"])
+            return
+        self.boton_comprobante.pack_forget()
+        self.boton_confirmar.pack(side="right")
+        self.boton_confirmar.state(["!disabled"] if acciones["puede_confirmar"] and con_camion else ["disabled"])
+        if orden.estado.etiqueta == "Anulada":
+            self.totales.configure(text="Orden anulada: no sale nada de bodega.", foreground=COLORES["suave"])
+        elif con_lineas:
+            self.totales.configure(text=f"{orden.unidades} unidades con {self.transporte.get() or '—'}",
+                                   foreground=COLORES["texto"])
+        else:
+            self.totales.configure(text="Paso 1: agrega al menos una prenda.", foreground=COLORES["suave"])
+
+    def _pintar_pasos(self, hechos: tuple[bool, bool, bool]) -> None:
+        activo = hechos.index(False) if False in hechos else None
+        for indice, (numero, nombre) in enumerate(self._etiquetas_paso):
+            if hechos[indice]:
+                numero.configure(text="✓", bg=COLORES["exito"], fg="#ffffff")
+                nombre.configure(fg=COLORES["texto"])
+            elif indice == activo:
+                numero.configure(text=str(indice + 1), bg=COLORES["acento"], fg="#ffffff")
+                nombre.configure(fg=COLORES["acento"])
+            else:
+                numero.configure(text=str(indice + 1), bg=COLORES["borde"], fg=COLORES["suave"])
+                nombre.configure(fg=COLORES["suave"])
+
+    # ----- Acciones -----
 
     def crear(self) -> None:
         codigo = self._tiendas.get(self.tienda.get(), "")
@@ -148,56 +369,10 @@ class Traslados(Pantalla):
         if not ok:
             return
         self._folio = orden.folio
-        informar(self.winfo_toplevel(), "Orden creada", f"Orden {orden.folio} en borrador. Agrega las prendas.")
+        self.transporte.set("")
+        informar(self.winfo_toplevel(), "Orden creada", f"{orden.folio} está en borrador. Agrega las prendas.")
         self.refrescar()
-
-    def al_seleccionar(self, _evento=None) -> None:
-        seleccion = self.tabla.selection()
-        self._folio = seleccion[0] if seleccion else None
-        self._mostrar(self._folio)
-
-    def _mostrar(self, folio: str | None) -> None:
-        self.lineas.delete(*self.lineas.get_children())
-        if not folio:
-            self.totales.configure(text="Selecciona o crea una orden.")
-            self.cotizacion.configure(text="")
-            self._habilitar({})
-            return
-        orden = self.controlador.obtener_orden(folio)
-        for detalle in orden.detalles:
-            self.lineas.insert(
-                "",
-                "end",
-                iid=detalle.sku,
-                values=(detalle.sku, detalle.nombre, detalle.talla, detalle.color, detalle.cantidad),
-            )
-        self.totales.configure(
-            text=f"{orden.folio} · {orden.estado.etiqueta} · {len(orden.detalles)} líneas · {orden.unidades} unidades"
-        )
-        self._mostrar_despacho(orden)
-        self._habilitar(self.controlador.acciones(folio))
-
-    def _mostrar_despacho(self, orden) -> None:
-        """Muestra lo que cotiza cada camión y propone el más conveniente."""
-        if orden.despacho is not None and orden.aplicada:
-            self.transporte.set(orden.despacho.nombre)
-            self.cotizacion.configure(text=f"Despachada: {orden.despacho.resumen()}")
-            self.combo_transporte.configure(state="disabled")
-            return
-        filas = self.controlador.cotizar_despachos(orden.folio)
-        self.cotizacion.configure(text="\n".join(f"{nombre}: {texto}" for nombre, texto in filas))
-        sugerido = self.controlador.transporte_sugerido(orden.folio)
-        self.transporte.set(sugerido)
-        self.combo_transporte.configure(state="readonly" if orden.detalles else "disabled")
-
-    def _habilitar(self, acciones: dict[str, bool]) -> None:
-        def estado(clave: str) -> str:
-            return "normal" if acciones.get(clave) else "disabled"
-
-        self.boton_agregar.configure(state=estado("puede_editar_items"))
-        self.boton_quitar.configure(state=estado("puede_editar_items"))
-        self.boton_confirmar.configure(state=estado("puede_confirmar"))
-        self.boton_anular.configure(state=estado("puede_anular"))
+        self.combo_sku.focus_set()
 
     def agregar(self) -> None:
         if not self._folio:
@@ -209,7 +384,9 @@ class Traslados(Pantalla):
         if not ok:
             return
         self.cantidad.set("1")
+        self.sku.set("")
         self.refrescar()
+        self.combo_sku.focus_set()
 
     def quitar(self) -> None:
         if not self._folio:
@@ -217,7 +394,7 @@ class Traslados(Pantalla):
             return
         seleccion = self.lineas.selection()
         if not seleccion:
-            mostrar_error(self.winfo_toplevel(), "Selecciona la línea que quieres quitar.")
+            mostrar_error(self.winfo_toplevel(), "Selecciona en la tabla la línea que quieres quitar.")
             return
         ok, _orden = self.ejecutar(lambda: self.controlador.quitar_de_orden(self._folio, seleccion[0]))
         if ok:
@@ -228,14 +405,15 @@ class Traslados(Pantalla):
             mostrar_error(self.winfo_toplevel(), "Selecciona una orden.")
             return
         folio = self._folio
+        transporte = self.transporte.get()
         if not pedir_confirmacion(
             self.winfo_toplevel(),
             "Confirmar traslado",
-            f"¿Confirmar la orden {folio} con {self.transporte.get() or 'el transporte elegido'}? "
+            f"¿Confirmar la orden {folio} con {transporte or 'el transporte elegido'}?\n\n"
             "Las unidades se descuentan de la bodega y no se puede deshacer.",
         ):
             return
-        ok, _comprobante = self.ejecutar(lambda: self.controlador.confirmar_orden(folio, self.transporte.get()))
+        ok, _comprobante = self.ejecutar(lambda: self.controlador.confirmar_orden(folio, transporte))
         if not ok:
             self.refrescar()
             return

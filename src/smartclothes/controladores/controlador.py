@@ -51,16 +51,47 @@ class Controlador:
     def transportes() -> tuple[str, ...]:
         return tuple(clase().nombre for clase in TRANSPORTES)
 
-    def cotizar_despachos(self, folio: str) -> list[tuple[str, str]]:
-        """(nombre del camión, texto con costo y ocupación o motivo por el que no sirve)."""
-        filas = []
+    def cotizar_despachos(self, folio: str) -> list[dict]:
+        """Lo que ofrece cada camión para la orden: costo y ocupación, o por qué no sirve."""
+        sugerido = self.transporte_sugerido(folio)
+        cotizaciones = []
         for transporte, plan, motivo in self._sistema.cotizar_despachos(folio):
-            if plan:
-                texto = f"{pesos(plan.costo)} · ocupación {plan.ocupacion}%"
-            else:
-                texto = f"no apto: {motivo}"
-            filas.append((transporte.nombre, texto))
-        return filas
+            cotizaciones.append({
+                "nombre": transporte.nombre,
+                "descripcion": transporte.descripcion(),
+                "apto": plan is not None,
+                "costo": pesos(plan.costo) if plan else "",
+                "ocupacion": plan.ocupacion if plan else 0,
+                "motivo": motivo,
+                "sugerido": transporte.nombre == sugerido,
+            })
+        return cotizaciones
+
+    def productos_criticos(self, umbral: int = 10) -> list:
+        """Prendas agotadas o con poco stock, de menor a mayor stock."""
+        criticos = [producto for producto in self._sistema.listar_productos() if producto.stock <= umbral]
+        return sorted(criticos, key=lambda producto: producto.stock)
+
+    def ultimos_documentos(self, cantidad: int = 5) -> list:
+        documentos = sorted(self._sistema.listar_documentos(), key=lambda doc: (doc.fecha, doc.folio), reverse=True)
+        return documentos[:cantidad]
+
+    def ordenes_de_tienda(self, codigo: str) -> int:
+        return sum(1 for orden in self._sistema.listar_ordenes() if orden.tienda_codigo == codigo)
+
+    def buscar_productos(self, texto: str = "", tipo: str = "Todos") -> list:
+        """Filtra por texto (SKU, nombre o color) y por tipo de prenda o estado."""
+        buscado = texto.strip().lower()
+        resultado = []
+        for producto in self._sistema.listar_productos():
+            if tipo == "Agotados" and producto.disponible:
+                continue
+            if tipo not in ("Todos", "Agotados") and producto.tipo_visible != tipo:
+                continue
+            if buscado and buscado not in f"{producto.sku} {producto.nombre} {producto.color}".lower():
+                continue
+            resultado.append(producto)
+        return resultado
 
     def transporte_sugerido(self, folio: str) -> str:
         transporte = self._sistema.transporte_sugerido(folio)
