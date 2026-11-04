@@ -87,7 +87,7 @@ def aplicar(raiz: tk.Tk) -> None:
     # Botones
     estilo.configure("TButton", background=c["tarjeta"], foreground=c["texto"], padding=(14, 7),
                      borderwidth=1, relief="solid", bordercolor="#d3d8e0", lightcolor=c["tarjeta"],
-                     darkcolor=c["tarjeta"], font=fuente(10))
+                     darkcolor=c["tarjeta"], font=fuente(10), width=-6)
     estilo.map("TButton",
                background=[("disabled", c["tarjeta"]), ("pressed", "#e9ecf1"), ("active", "#f0f2f5")],
                foreground=[("disabled", "#b4bac4")],

@@ -20,14 +20,18 @@ class EstadoProducto(Enum):
         return {EstadoProducto.DISPONIBLE: "Disponible", EstadoProducto.AGOTADO: "Agotado"}[self]
 
 
-class Producto(ABC):
-    """Atributos comunes: SKU, nombre, foto, stock, talla, color y estado."""
+LINEAS = ("Dama", "Hombre", "Infantil")
 
-    def __init__(self, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str):
+
+class Producto(ABC):
+    """Atributos comunes: SKU, nombre, foto, stock, talla, color, línea y estado."""
+
+    def __init__(self, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str, linea: str):
         self._sku = sku_valido(sku)
         self._nombre = texto_obligatorio(nombre, "Nombre")
         self._foto = texto_obligatorio(foto, "Foto")
-        self._talla = opcion(talla, self.tallas_validas(), "Talla")
+        self._linea = opcion(linea, LINEAS, "Línea")
+        self._talla = opcion(talla, self.tallas_para(self._linea), "Talla")
         self._color = texto_obligatorio(color, "Color")
         self._stock = exigir_entero(stock, "Stock", minimo=0)
         self._estado = EstadoProducto.DISPONIBLE
@@ -55,6 +59,11 @@ class Producto(ABC):
     @property
     def talla(self) -> str:
         return self._talla
+
+    @property
+    def linea(self) -> str:
+        """Dama, Hombre o Infantil."""
+        return self._linea
 
     @property
     def color(self) -> str:
@@ -92,7 +101,17 @@ class Producto(ABC):
     @classmethod
     @abstractmethod
     def tallas_validas(cls) -> tuple[str, ...]:
-        """Cada tipo de prenda usa su propia tabla de tallas."""
+        """Cada tipo de prenda usa su propia tabla de tallas de adulto."""
+
+    @classmethod
+    @abstractmethod
+    def tallas_infantiles(cls) -> tuple[str, ...]:
+        """Tallas de la línea Infantil para este tipo de prenda."""
+
+    @classmethod
+    def tallas_para(cls, linea: str) -> tuple[str, ...]:
+        """La línea Infantil usa tallas de niño; Dama y Hombre, tallas de adulto."""
+        return cls.tallas_infantiles() if linea == "Infantil" else cls.tallas_validas()
 
     @abstractmethod
     def actualizar_especifico(self, extra: object) -> None:
@@ -108,15 +127,17 @@ class Producto(ABC):
         nombre = self._nombre
         if not nombre.lower().startswith(self.tipo_visible.lower()):
             nombre = f"{self.tipo_visible} {nombre}"
-        texto = f"{nombre} · Talla {self._talla} · {self._color}"
+        texto = f"{nombre} {self._linea} · Talla {self._talla} · {self._color}"
         return f"{texto} · {self.detalle}" if self.detalle else texto
 
-    def actualizar(self, nombre: str, foto: str, talla: str, color: str) -> None:
+    def actualizar(self, nombre: str, foto: str, talla: str, color: str, linea: str) -> None:
         """Edita los datos descriptivos. El stock y el estado no se tocan aquí."""
         nombre_limpio = texto_obligatorio(nombre, "Nombre")
         foto_limpia = texto_obligatorio(foto, "Foto")
-        talla_limpia = opcion(talla, self.tallas_validas(), "Talla")
+        linea_limpia = opcion(linea, LINEAS, "Línea")
+        talla_limpia = opcion(talla, self.tallas_para(linea_limpia), "Talla")
         color_limpio = texto_obligatorio(color, "Color")
+        self._linea = linea_limpia
         self._nombre = nombre_limpio
         self._foto = foto_limpia
         self._talla = talla_limpia
@@ -155,6 +176,7 @@ class Producto(ABC):
             "stock": self._stock,
             "talla": self._talla,
             "color": self._color,
+            "linea": self._linea,
             "estado": self._estado.value,
         }
         datos.update(self._extras())
@@ -167,9 +189,11 @@ class Producto(ABC):
 class Pantalon(Producto):
     CORTES = ("Slim", "Regular", "Skinny")
     TALLAS = ("36", "38", "40", "42", "44", "46", "48", "50")
+    TALLAS_INFANTILES = ("2", "4", "6", "8", "10", "12", "14", "16")
 
-    def __init__(self, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str, corte: str):
-        super().__init__(sku, nombre, foto, stock, talla, color)
+    def __init__(self, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str, linea: str,
+                 corte: str):
+        super().__init__(sku, nombre, foto, stock, talla, color, linea)
         self._corte = opcion(corte, self.CORTES, "Corte")
 
     @property
@@ -192,6 +216,10 @@ class Pantalon(Producto):
     def tallas_validas(cls) -> tuple[str, ...]:
         return cls.TALLAS
 
+    @classmethod
+    def tallas_infantiles(cls) -> tuple[str, ...]:
+        return cls.TALLAS_INFANTILES
+
     def actualizar_especifico(self, extra: object) -> None:
         self._corte = opcion(extra, self.CORTES, "Corte")
 
@@ -202,9 +230,11 @@ class Pantalon(Producto):
 class Calzado(Producto):
     ESTILOS = ("Deportivo", "Casual", "Formal")
     TALLAS = tuple(str(numero) for numero in range(35, 47))
+    TALLAS_INFANTILES = tuple(str(numero) for numero in range(20, 35))
 
-    def __init__(self, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str, estilo: str):
-        super().__init__(sku, nombre, foto, stock, talla, color)
+    def __init__(self, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str, linea: str,
+                 estilo: str):
+        super().__init__(sku, nombre, foto, stock, talla, color, linea)
         self._estilo = opcion(estilo, self.ESTILOS, "Estilo")
 
     @property
@@ -227,6 +257,10 @@ class Calzado(Producto):
     def tallas_validas(cls) -> tuple[str, ...]:
         return cls.TALLAS
 
+    @classmethod
+    def tallas_infantiles(cls) -> tuple[str, ...]:
+        return cls.TALLAS_INFANTILES
+
     def actualizar_especifico(self, extra: object) -> None:
         self._estilo = opcion(extra, self.ESTILOS, "Estilo")
 
@@ -238,6 +272,7 @@ class Polera(Producto):
     """Usa solo la estructura base. No agrega atributos."""
 
     TALLAS = ("XS", "S", "M", "L", "XL", "XXL")
+    TALLAS_INFANTILES = ("2", "4", "6", "8", "10", "12", "14", "16")
 
     @property
     def tipo(self) -> str:
@@ -255,6 +290,10 @@ class Polera(Producto):
     def tallas_validas(cls) -> tuple[str, ...]:
         return cls.TALLAS
 
+    @classmethod
+    def tallas_infantiles(cls) -> tuple[str, ...]:
+        return cls.TALLAS_INFANTILES
+
     def actualizar_especifico(self, extra: object) -> None:
         return None
 
@@ -270,13 +309,13 @@ TIPOS_PRODUCTO: dict[str, type[Producto]] = {
 
 
 def crear_producto(tipo: str, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str,
-                   extra: object = None) -> Producto:
+                   linea: str, extra: object = None) -> Producto:
     clase = TIPOS_PRODUCTO.get(tipo)
     if clase is None:
         raise ReglaNegocioError("El producto debe ser Pantalón, Calzado o Polera")
     if clase is Polera:
-        return Polera(sku, nombre, foto, stock, talla, color)
-    return clase(sku, nombre, foto, stock, talla, color, extra)
+        return Polera(sku, nombre, foto, stock, talla, color, linea)
+    return clase(sku, nombre, foto, stock, talla, color, linea, extra)
 
 
 def producto_desde_diccionario(datos: dict) -> Producto:
@@ -291,6 +330,7 @@ def producto_desde_diccionario(datos: dict) -> Producto:
             datos["stock"],
             str(datos["talla"]),
             datos["color"],
+            datos["linea"],
         )
         if tipo == "pantalon":
             producto: Producto = Pantalon(*comunes, datos["corte"])

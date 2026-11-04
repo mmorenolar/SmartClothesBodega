@@ -7,6 +7,7 @@
     "stock": 420,
     "talla": "M",
     "color": "Blanco",
+    "linea": "Dama",
     "estado": "DISPONIBLE"
   },
   {
@@ -17,16 +18,18 @@
     "stock": 310,
     "talla": "L",
     "color": "Negro",
+    "linea": "Hombre",
     "estado": "DISPONIBLE"
   },
   {
-    "sku": "POL-EST-RO-S",
+    "sku": "POL-EST-RO-8",
     "tipo": "polera",
     "nombre": "Polera Estampada",
     "foto": "fotos/polera-estampada-roja.png",
     "stock": 0,
-    "talla": "S",
+    "talla": "8",
     "color": "Rojo",
+    "linea": "Infantil",
     "estado": "AGOTADO"
   },
   {
@@ -37,6 +40,7 @@
     "stock": 180,
     "talla": "40",
     "color": "Azul",
+    "linea": "Dama",
     "estado": "DISPONIBLE",
     "corte": "Slim"
   },
@@ -48,6 +52,7 @@
     "stock": 95,
     "talla": "42",
     "color": "Beige",
+    "linea": "Hombre",
     "estado": "DISPONIBLE",
     "corte": "Regular"
   },
@@ -59,6 +64,7 @@
     "stock": 12,
     "talla": "38",
     "color": "Negro",
+    "linea": "Dama",
     "estado": "DISPONIBLE",
     "corte": "Skinny"
   },
@@ -70,17 +76,19 @@
     "stock": 140,
     "talla": "41",
     "color": "Blanco",
+    "linea": "Hombre",
     "estado": "DISPONIBLE",
     "estilo": "Deportivo"
   },
   {
-    "sku": "CAL-CAS-CA-40",
+    "sku": "CAL-CAS-CA-30",
     "tipo": "calzado",
     "nombre": "Zapatilla Urbana",
     "foto": "fotos/zapatilla-urbana-cafe.png",
     "stock": 60,
-    "talla": "40",
+    "talla": "30",
     "color": "Café",
+    "linea": "Infantil",
     "estado": "DISPONIBLE",
     "estilo": "Casual"
   },
@@ -92,6 +100,7 @@
     "stock": 8,
     "talla": "42",
     "color": "Negro",
+    "linea": "Hombre",
     "estado": "DISPONIBLE",
     "estilo": "Formal"
   }

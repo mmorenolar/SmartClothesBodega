@@ -22,13 +22,13 @@ class BodegaBase(unittest.TestCase):
         self._temporal = tempfile.TemporaryDirectory()
         self.sistema = SmartClothes(RepositorioJSON(self._temporal.name))
         self.jeans = self.sistema.registrar_producto(
-            "Pantalón", "PAN-SLIM-AZ-40", "Jeans Slim", "fotos/jeans.png", 10, "40", "Azul", "Slim"
+            "Pantalón", "PAN-SLIM-AZ-40", "Jeans Slim", "fotos/jeans.png", 10, "40", "Azul", "Dama", "Slim"
         )
         self.zapatilla = self.sistema.registrar_producto(
-            "Calzado", "CAL-DEP-BL-41", "Zapatilla Runner", "fotos/zapatilla.png", 5, "41", "Blanco", "Deportivo"
+            "Calzado", "CAL-DEP-BL-41", "Zapatilla Runner", "fotos/zapatilla.png", 5, "41", "Blanco", "Hombre", "Deportivo"
         )
         self.polera = self.sistema.registrar_producto(
-            "Polera", "POL-BAS-NE-M", "Polera Básica", "fotos/polera.png", 3, "M", "Negro"
+            "Polera", "POL-BAS-NE-M", "Polera Básica", "fotos/polera.png", 3, "M", "Negro", "Hombre"
         )
         self.tienda = self.sistema.registrar_tienda("T-CENTRO", "Smart Clothes Centro", "Ahumada 120")
         self.otra = self.sistema.registrar_tienda("T-PROVI", "Smart Clothes Providencia", "Providencia 2150")
@@ -159,13 +159,13 @@ class ReglasTests(BodegaBase):
                 setattr(self.jeans, atributo, 99)
         self.assertFalse(hasattr(self.jeans, "set_stock"))
         self.assertFalse(hasattr(self.jeans, "__actualizar_estado"))
-        self.sistema.editar_producto(self.jeans.sku, "Jeans Slim Fit", "fotos/jeans.png", "42", "Azul", "Regular")
+        self.sistema.editar_producto(self.jeans.sku, "Jeans Slim Fit", "fotos/jeans.png", "42", "Azul", "Dama", "Regular")
         self.assertEqual(self.jeans.stock, 10, "Editar la ficha no cambia el stock")
         self.assertEqual((self.jeans.talla, self.jeans.corte), ("42", "Regular"))
 
     def test_herencia_abstraccion_y_polimorfismo(self):
         with self.assertRaises(TypeError):
-            Producto("X-1", "X", "x.png", 1, "M", "Rojo")
+            Producto("X-1", "X", "x.png", 1, "M", "Rojo", "Dama")
         with self.assertRaises(TypeError):
             SalidaBodega("F-1", HOY)
         self.assertIsInstance(self.jeans, Pantalon)
@@ -185,16 +185,37 @@ class ReglasTests(BodegaBase):
         self.assertEqual({type(documento) for documento in documentos}, {OrdenTraslado, RegistroMerma})
         self.assertEqual(merma.lineas(), ((self.jeans.sku, 1),))
 
+    def test_linea_dama_hombre_infantil_con_sus_tallas(self):
+        nino = self.sistema.registrar_producto(
+            "Polera", "POL-NIN-AZ-8", "Polera Dino", "fotos/polera.png", 5, "8", "Azul", "Infantil"
+        )
+        zapatilla = self.sistema.registrar_producto(
+            "Calzado", "CAL-NIN-RO-28", "Zapatilla Luces", "fotos/zapatilla.png", 5, "28", "Rosado", "Infantil",
+            "Deportivo",
+        )
+        self.assertEqual((nino.linea, nino.talla), ("Infantil", "8"))
+        self.assertIn("Infantil", zapatilla.descripcion())
+        self.assertEqual(self.jeans.linea, "Dama")
+        self.assertNotEqual(Polera.tallas_para("Infantil"), Polera.tallas_para("Dama"))
+        with self.assertRaises(ReglaNegocioError):
+            self.sistema.editar_producto(nino.sku, "Polera Dino", "fotos/polera.png", "8", "Azul", "Hombre")
+        self.assertEqual(nino.linea, "Infantil", "Un cambio inválido no deja la ficha a medias")
+        self.sistema.editar_producto(nino.sku, "Polera Dino", "fotos/polera.png", "M", "Azul", "Hombre")
+        self.assertEqual((nino.linea, nino.talla), ("Hombre", "M"))
+
     def test_validaciones_de_ficha(self):
         casos = (
-            ("Polera", "POL-1", "Polera", "p.png", 1, "40", "Rojo", None),
-            ("Pantalón", "PAN-1", "Jeans", "p.png", 1, "40", "Azul", "Ancho"),
-            ("Calzado", "CAL-1", "Bota", "p.png", 1, "41", "Café", "Trekking"),
-            ("Polera", "POL 1", "Polera", "p.png", 1, "M", "Rojo", None),
-            ("Polera", "POL-2", "Polera", "", 1, "M", "Rojo", None),
-            ("Polera", "POL-3", "Polera", "p.png", -1, "M", "Rojo", None),
-            ("Polera", "pol-bas-ne-m", "Repetida", "p.png", 1, "M", "Rojo", None),
-            ("Chaqueta", "CHA-1", "Parka", "p.png", 1, "M", "Rojo", None),
+            ("Polera", "POL-1", "Polera", "p.png", 1, "40", "Rojo", "Dama", None),
+            ("Pantalón", "PAN-1", "Jeans", "p.png", 1, "40", "Azul", "Hombre", "Ancho"),
+            ("Calzado", "CAL-1", "Bota", "p.png", 1, "41", "Café", "Hombre", "Trekking"),
+            ("Polera", "POL 1", "Polera", "p.png", 1, "M", "Rojo", "Dama", None),
+            ("Polera", "POL-2", "Polera", "", 1, "M", "Rojo", "Dama", None),
+            ("Polera", "POL-3", "Polera", "p.png", -1, "M", "Rojo", "Dama", None),
+            ("Polera", "pol-bas-ne-m", "Repetida", "p.png", 1, "M", "Rojo", "Dama", None),
+            ("Chaqueta", "CHA-1", "Parka", "p.png", 1, "M", "Rojo", "Dama", None),
+            ("Polera", "POL-4", "Polera", "p.png", 1, "M", "Rojo", "Mascotas", None),
+            ("Polera", "POL-5", "Polera niño", "p.png", 1, "M", "Rojo", "Infantil", None),
+            ("Calzado", "CAL-2", "Zapatilla niño", "p.png", 1, "41", "Azul", "Infantil", "Casual"),
         )
         for datos in casos:
             with self.assertRaises(ReglaNegocioError, msg=str(datos)):
@@ -215,7 +236,7 @@ class ReglasTests(BodegaBase):
     def test_comprobante_guarda_los_datos_del_momento(self):
         orden = self.orden_con((self.jeans.sku, 2))
         self.sistema.confirmar_orden(orden.folio, CamionLiviano())
-        self.sistema.editar_producto(self.jeans.sku, "Jeans Nuevo", "fotos/otra.png", "40", "Celeste", "Slim")
+        self.sistema.editar_producto(self.jeans.sku, "Jeans Nuevo", "fotos/otra.png", "40", "Celeste", "Dama", "Slim")
         comprobante = self.sistema.emitir_comprobante(orden.folio)
         self.assertIn("Jeans Slim", comprobante)
         self.assertNotIn("Jeans Nuevo", comprobante)
@@ -232,7 +253,7 @@ class ReglasTests(BodegaBase):
 
     def test_despacho_polimorfico_liviano_y_pesado(self):
         bodega = self.sistema.registrar_producto(
-            "Polera", "POL-STOCK-L", "Polera Stock", "fotos/polera.png", 1000, "L", "Gris"
+            "Polera", "POL-STOCK-L", "Polera Stock", "fotos/polera.png", 1000, "L", "Gris", "Hombre"
         )
         chica = self.orden_con((self.jeans.sku, 5))
         grande = self.orden_con((bodega.sku, 400))
@@ -306,7 +327,8 @@ class PersistenciaTests(BodegaBase):
         sistema = SmartClothes(RepositorioJSON(raiz))
         self.assertEqual(sistema.advertencias, ())
         self.assertEqual(sistema.obtener_producto("PAN-SLIM-AZ-40").detalle, "Corte Slim")
-        self.assertIs(sistema.obtener_producto("POL-EST-RO-S").estado, EstadoProducto.AGOTADO)
+        self.assertEqual({producto.linea for producto in sistema.listar_productos()}, {"Dama", "Hombre", "Infantil"})
+        self.assertIs(sistema.obtener_producto("POL-EST-RO-8").estado, EstadoProducto.AGOTADO)
         self.assertEqual(len(sistema.listar_tiendas()), 3)
         for producto in sistema.listar_productos():
             self.assertTrue((raiz / producto.foto).exists(), producto.foto)
@@ -325,8 +347,8 @@ class ControladorTests(unittest.TestCase):
     def test_rechaza_texto_que_no_es_entero_ni_fecha(self):
         for stock in ("", "abc", "1.5", "6.000", "-5"):
             with self.assertRaises(ReglaNegocioError):
-                self.controlador.registrar_producto("Polera", "POL-1", "Polera", "p.png", stock, "M", "Rojo", "")
-        self.controlador.registrar_producto("Polera", "pol-1", "Polera", "p.png", "0", "m", "Rojo", "")
+                self.controlador.registrar_producto("Polera", "POL-1", "Polera", "p.png", stock, "M", "Rojo", "Dama", "")
+        self.controlador.registrar_producto("Polera", "pol-1", "Polera", "p.png", "0", "m", "Rojo", "dama", "")
         producto = self.controlador.listar_productos()[0]
         self.assertEqual((producto.sku, producto.talla, producto.estado), ("POL-1", "M", EstadoProducto.AGOTADO))
         self.controlador.registrar_tienda("t-1", "Tienda", "Calle 1")
@@ -337,7 +359,7 @@ class ControladorTests(unittest.TestCase):
             self.controlador.registrar_merma("POL-1", "1", "Robo", "Motivo que no existe")
 
     def test_exporta_comprobante(self):
-        self.controlador.registrar_producto("Calzado", "CAL-1", "Bota", "b.png", "4", "40", "Café", "Casual")
+        self.controlador.registrar_producto("Calzado", "CAL-1", "Bota", "b.png", "4", "40", "Café", "Hombre", "Casual")
         merma = self.controlador.registrar_merma("CAL-1", "1", "Daño", "Caja aplastada y suela rota")
         destino = Path(self._temporal.name) / "comprobante.txt"
         self.controlador.exportar_comprobante(merma.folio, str(destino))
@@ -428,6 +450,7 @@ class InterfazTests(unittest.TestCase):
         productos.talla.set("40")
         productos.color.set("Azul")
         productos.extra.set("Slim")
+        productos.linea.set("Dama")
         productos.foto.set("fotos/jeans.png")
         productos.stock.set("5")
         productos.registrar()

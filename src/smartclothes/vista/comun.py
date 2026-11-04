@@ -255,7 +255,7 @@ def crear_tabla(
     )
     if con_imagen:
         tabla.heading("#0", text="")
-        tabla.column("#0", width=66, stretch=False, anchor="center")
+        tabla.column("#0", width=56, stretch=False, anchor="center")
     scroll = ttk.Scrollbar(marco, orient="vertical", command=tabla.yview)
     tabla.configure(yscrollcommand=scroll.set)
     for columna, encabezado_col, ancho in zip(columnas, encabezados, anchos):

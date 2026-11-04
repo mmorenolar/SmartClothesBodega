@@ -58,8 +58,8 @@ Una orden se edita solo en Borrador. Confirmada es final: las prendas ya saliero
 
 ## Reglas
 
-1. Toda prenda tiene SKU, nombre, foto, stock, talla, color y estado. El pantalón agrega **corte** (Slim, Regular, Skinny), el calzado agrega **estilo** (Deportivo, Casual, Formal) y la polera no agrega nada.
-2. Cada tipo de prenda valida su propia tabla de tallas: polera XS–XXL, pantalón 36–50, calzado 35–46.
+1. Toda prenda tiene SKU, nombre, foto, stock, talla, color, **línea** (Dama, Hombre o Infantil) y estado. El pantalón agrega **corte** (Slim, Regular, Skinny), el calzado agrega **estilo** (Deportivo, Casual, Formal) y la polera no agrega nada.
+2. Cada tipo de prenda valida su propia tabla de tallas: polera XS–XXL, pantalón 36–50, calzado 35–46. La línea Infantil usa tallas de niño: polera y pantalón 2–16, calzado 20–34.
 3. El SKU es único, en mayúsculas, con letras, números y guiones.
 4. Una orden de traslado lleva fecha de despacho (no anterior a hoy), tienda destino y prendas elegidas por SKU con su cantidad.
 5. No se agrega una cantidad mayor que el stock, contando lo ya reservado en otras órdenes en borrador. La prenda debe estar **Disponible**.

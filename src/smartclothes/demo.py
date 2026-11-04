@@ -14,9 +14,9 @@ from smartclothes.persistencia.repositorio_json import RepositorioJSON
 def main() -> None:
     with TemporaryDirectory() as carpeta:
         bodega = SmartClothes(RepositorioJSON(carpeta))
-        jeans = bodega.registrar_producto("Pantalón", "PAN-SLIM-AZ-40", "Jeans Slim", "fotos/jeans.png", 6, "40", "Azul", "Slim")
-        zapatilla = bodega.registrar_producto("Calzado", "CAL-DEP-BL-41", "Zapatilla Runner", "fotos/zapatilla.png", 4, "41", "Blanco", "Deportivo")
-        polera = bodega.registrar_producto("Polera", "POL-BAS-NE-M", "Polera Básica", "fotos/polera.png", 3, "M", "Negro")
+        jeans = bodega.registrar_producto("Pantalón", "PAN-SLIM-AZ-40", "Jeans Slim", "fotos/jeans.png", 6, "40", "Azul", "Dama", "Slim")
+        zapatilla = bodega.registrar_producto("Calzado", "CAL-DEP-BL-41", "Zapatilla Runner", "fotos/zapatilla.png", 4, "41", "Blanco", "Hombre", "Deportivo")
+        polera = bodega.registrar_producto("Polera", "POL-BAS-NE-M", "Polera Básica", "fotos/polera.png", 3, "M", "Negro", "Hombre")
         tienda = bodega.registrar_tienda("T-CENTRO", "Smart Clothes Centro", "Ahumada 120, Santiago")
 
         orden = bodega.crear_orden(tienda.codigo, date.today())

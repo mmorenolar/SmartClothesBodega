@@ -36,14 +36,16 @@ class Productos(Pantalla):
         ttk.Button(cabecera, text="+  Nueva prenda", style="Primario.TButton", command=self.limpiar).pack(
             side="right"
         )
+        self.contador = ttk.Label(cabecera, style="Subtitulo.TLabel")
+        self.contador.pack(side="right", padx=16, anchor="s")
 
         # ----- Barra de búsqueda y filtros -----
         barra = Tarjeta(self, padding=12)
         barra.pack(fill="x", pady=(0, 14))
         self.busqueda = tk.StringVar()
-        buscador = ttk.Entry(barra, textvariable=self.busqueda, width=34)
+        buscador = ttk.Entry(barra, textvariable=self.busqueda, width=26)
         buscador.pack(side="left")
-        self._marcador(buscador, "Buscar por SKU, nombre o color…")
+        self._marcador(buscador, "Buscar SKU, nombre o color…")
         self.busqueda.trace_add("write", lambda *_a: self._llenar_tabla())
         self.filtro = tk.StringVar(value="Todos")
         segmentos = tk.Frame(barra, bg=COLORES["tarjeta"])
@@ -51,8 +53,11 @@ class Productos(Pantalla):
         for texto in FILTROS:
             ttk.Radiobutton(segmentos, text=texto, value=texto, variable=self.filtro, style="Segmento.Toolbutton",
                             command=self._llenar_tabla).pack(side="left", padx=(0, 4))
-        self.contador = ttk.Label(barra, style="Ayuda.TLabel")
-        self.contador.pack(side="right")
+        self.filtro_linea = tk.StringVar(value="Todas las líneas")
+        combo_linea = ttk.Combobox(barra, textvariable=self.filtro_linea, state="readonly", width=15,
+                                   values=("Todas las líneas", *self.controlador.lineas()))
+        combo_linea.pack(side="left")
+        combo_linea.bind("<<ComboboxSelected>>", lambda _e: self._llenar_tabla())
 
         # ----- Cuerpo: tabla a la izquierda, ficha a la derecha -----
         cuerpo = ttk.Frame(self)
@@ -64,9 +69,9 @@ class Productos(Pantalla):
         tarjeta_tabla.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
         marco, self.tabla = crear_tabla(
             tarjeta_tabla,
-            ("sku", "nombre", "talla", "color", "stock", "estado"),
-            ("SKU", "Prenda", "Talla", "Color", "Stock", "Estado"),
-            (132, 132, 50, 66, 55, 106),
+            ("sku", "nombre", "linea", "talla", "color", "stock", "estado"),
+            ("SKU", "Prenda", "Línea", "Talla", "Color", "Stock", "Estado"),
+            (126, 114, 62, 46, 56, 50, 98),
             altura=7,
             con_imagen=True,
         )
@@ -92,8 +97,8 @@ class Productos(Pantalla):
         self.chip_estado = chip(cabeza, "", "neutro")
 
         foto = tk.Frame(panel, bg=COLORES["tarjeta"])
-        foto.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 8))
-        caja = tk.Frame(foto, bg=COLORES["fondo"], width=96, height=96)
+        foto.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 6))
+        caja = tk.Frame(foto, bg=COLORES["fondo"], width=84, height=84)
         caja.pack(side="left")
         caja.pack_propagate(False)
         self.lbl_previa = tk.Label(caja, text="Sin\nfoto", bg=COLORES["fondo"], fg=COLORES["suave"],
@@ -110,7 +115,7 @@ class Productos(Pantalla):
         self.tipo = tk.StringVar(value="Polera")
         etiqueta_campo(panel, "Tipo de prenda").grid(row=2, column=0, columnspan=2, sticky="w")
         tipos = tk.Frame(panel, bg=COLORES["tarjeta"])
-        tipos.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(2, 8))
+        tipos.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(2, 6))
         self._botones_tipo = []
         for tipo in self.controlador.tipos_producto():
             boton = ttk.Radiobutton(tipos, text=tipo, value=tipo, variable=self.tipo, style="Segmento.Toolbutton",
@@ -125,53 +130,61 @@ class Productos(Pantalla):
         self.extra = tk.StringVar()
         self.stock = tk.StringVar(value="0")
 
+        self.linea = tk.StringVar(value="Dama")
+        separacion = (2, 6)
+
         etiqueta_campo(panel, "SKU").grid(row=4, column=0, sticky="w")
-        etiqueta_campo(panel, "Talla").grid(row=4, column=1, sticky="w", padx=(8, 0))
+        etiqueta_campo(panel, "Línea").grid(row=4, column=1, sticky="w", padx=(8, 0))
         self.sku_entry = ttk.Entry(panel, textvariable=self.sku)
-        self.sku_entry.grid(row=5, column=0, sticky="ew", pady=(2, 8))
-        self.talla_combo = ttk.Combobox(panel, textvariable=self.talla, state="readonly", width=8)
-        self.talla_combo.grid(row=5, column=1, sticky="ew", padx=(8, 0), pady=(2, 8))
+        self.sku_entry.grid(row=5, column=0, sticky="ew", pady=separacion)
+        self.linea_combo = ttk.Combobox(panel, textvariable=self.linea, values=self.controlador.lineas(),
+                                        state="readonly", width=10)
+        self.linea_combo.grid(row=5, column=1, sticky="ew", padx=(8, 0), pady=separacion)
+        self.linea_combo.bind("<<ComboboxSelected>>", lambda _e: self._actualizar_tipo())
 
         etiqueta_campo(panel, "Nombre").grid(row=6, column=0, columnspan=2, sticky="w")
-        ttk.Entry(panel, textvariable=self.nombre).grid(row=7, column=0, columnspan=2, sticky="ew", pady=(2, 8))
+        ttk.Entry(panel, textvariable=self.nombre).grid(row=7, column=0, columnspan=2, sticky="ew", pady=separacion)
 
-        etiqueta_campo(panel, "Color").grid(row=8, column=0, sticky="w")
+        etiqueta_campo(panel, "Talla").grid(row=8, column=0, sticky="w")
+        etiqueta_campo(panel, "Color").grid(row=8, column=1, sticky="w", padx=(8, 0))
+        self.talla_combo = ttk.Combobox(panel, textvariable=self.talla, state="readonly", width=8)
+        self.talla_combo.grid(row=9, column=0, sticky="ew", pady=separacion)
+        ttk.Entry(panel, textvariable=self.color).grid(row=9, column=1, sticky="ew", padx=(8, 0), pady=separacion)
+
         self.lbl_extra = etiqueta_campo(panel, "Corte")
-        self.lbl_extra.grid(row=8, column=1, sticky="w", padx=(8, 0))
-        ttk.Entry(panel, textvariable=self.color).grid(row=9, column=0, sticky="ew", pady=(2, 8))
-        self.extra_combo = ttk.Combobox(panel, textvariable=self.extra, state="readonly", width=10)
-        self.extra_combo.grid(row=9, column=1, sticky="ew", padx=(8, 0), pady=(2, 8))
-
+        self.lbl_extra.grid(row=10, column=0, sticky="w")
         self.lbl_stock = etiqueta_campo(panel, "Stock inicial")
-        self.lbl_stock.grid(row=10, column=0, sticky="w")
+        self.lbl_stock.grid(row=10, column=1, sticky="w", padx=(8, 0))
+        self.extra_combo = ttk.Combobox(panel, textvariable=self.extra, state="readonly", width=10)
+        self.extra_combo.grid(row=11, column=0, sticky="ew", pady=separacion)
         self.stock_entry = ttk.Entry(panel, textvariable=self.stock)
-        self.stock_entry.grid(row=11, column=0, sticky="ew", pady=(2, 8))
-        self.lbl_disponible = ttk.Label(panel, style="Ayuda.TLabel", wraplength=120, justify="left")
-        self.lbl_disponible.grid(row=11, column=1, sticky="w", padx=(8, 0))
+        self.stock_entry.grid(row=11, column=1, sticky="ew", padx=(8, 0), pady=separacion)
+        self.lbl_disponible = ttk.Label(panel, style="Ayuda.TLabel")
+        self.lbl_disponible.grid(row=12, column=0, columnspan=2, sticky="w")
 
         acciones = tk.Frame(panel, bg=COLORES["tarjeta"])
-        acciones.grid(row=12, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        acciones.grid(row=13, column=0, columnspan=2, sticky="ew", pady=(6, 0))
         self.boton_registrar = ttk.Button(acciones, text="Registrar prenda", style="Primario.TButton",
                                           command=self.registrar)
         self.boton_guardar = ttk.Button(acciones, text="Guardar cambios", style="Primario.TButton",
                                         command=self.guardar)
         self.boton_limpiar = ttk.Button(acciones, text="Cancelar", command=self.limpiar)
-        self.boton_eliminar = ttk.Button(acciones, text="Eliminar", style="Peligro.TButton", command=self.eliminar)
         self.boton_registrar.pack(side="left")
         self.boton_guardar.pack(side="left")
         self.boton_limpiar.pack(side="left", padx=6)
-        self.boton_eliminar.pack(side="right")
 
         self.zona_ingreso = tk.Frame(panel, bg=COLORES["tarjeta"])
-        self.zona_ingreso.grid(row=13, column=0, columnspan=2, sticky="ew")
-        separador(self.zona_ingreso, pady=(14, 10))
+        self.zona_ingreso.grid(row=14, column=0, columnspan=2, sticky="ew")
+        separador(self.zona_ingreso, pady=(8, 6))
         etiqueta_campo(self.zona_ingreso, "Llegó mercadería: ingresar unidades a bodega").pack(anchor="w")
         linea = tk.Frame(self.zona_ingreso, bg=COLORES["tarjeta"])
         linea.pack(fill="x", pady=(4, 0))
         self.cantidad_ingreso = tk.StringVar(value="1")
-        ttk.Spinbox(linea, from_=1, to=9999, textvariable=self.cantidad_ingreso, width=8).pack(side="left")
-        self.boton_ingresar = ttk.Button(linea, text="Ingresar unidades", command=self.ingresar)
+        ttk.Spinbox(linea, from_=1, to=9999, textvariable=self.cantidad_ingreso, width=6).pack(side="left")
+        self.boton_ingresar = ttk.Button(linea, text="Ingresar", command=self.ingresar)
         self.boton_ingresar.pack(side="left", padx=8)
+        self.boton_eliminar = ttk.Button(linea, text="Eliminar", style="Peligro.TButton", command=self.eliminar)
+        self.boton_eliminar.pack(side="right")
 
     @staticmethod
     def _marcador(entrada: ttk.Entry, texto: str) -> None:
@@ -194,7 +207,7 @@ class Productos(Pantalla):
 
     def _actualizar_tipo(self) -> None:
         tipo = self.tipo.get()
-        tallas = list(self.controlador.tallas_de(tipo))
+        tallas = list(self.controlador.tallas_de(tipo, self.linea.get()))
         self.talla_combo["values"] = tallas
         if self.talla.get() not in tallas:
             self.talla.set(tallas[0] if tallas else "")
@@ -240,7 +253,9 @@ class Productos(Pantalla):
 
     def _llenar_tabla(self) -> None:
         texto = self.busqueda.get()
-        productos = self.controlador.buscar_productos(texto, self.filtro.get())
+        linea = self.filtro_linea.get()
+        productos = self.controlador.buscar_productos(texto, self.filtro.get(),
+                                                      "Todas" if linea.startswith("Todas") else linea)
         total = len(self.controlador.listar_productos())
         self.tabla.delete(*self.tabla.get_children())
         self._miniaturas.clear()
@@ -254,7 +269,8 @@ class Productos(Pantalla):
             fila(
                 self.tabla,
                 producto.sku,
-                (producto.sku, nombre, producto.talla, producto.color, producto.stock, f"●  {estado}"),
+                (producto.sku, nombre, producto.linea, producto.talla, producto.color, producto.stock,
+                 f"●  {estado}"),
                 tags=(tipo,) if tipo != "exito" else (),
                 **opciones,
             )
@@ -266,6 +282,7 @@ class Productos(Pantalla):
         if not self.tabla.exists(sku):
             self.busqueda.set("")
             self.filtro.set("Todos")
+            self.filtro_linea.set("Todas las líneas")
             self._llenar_tabla()
         if self.tabla.exists(sku):
             self.tabla.selection_set(sku)
@@ -279,6 +296,7 @@ class Productos(Pantalla):
         producto = self.controlador.obtener_producto(seleccion[0])
         self._sku = producto.sku
         self.tipo.set(producto.tipo_visible)
+        self.linea.set(producto.linea)
         self._actualizar_tipo()
         self.sku.set(producto.sku)
         self.nombre.set(producto.nombre)
@@ -297,11 +315,10 @@ class Productos(Pantalla):
         pintar_chip(self.chip_estado, estado, tipo)
         self.chip_estado.pack(side="right")
         self.lbl_disponible.configure(
-            text=f"Libre para traslado:\n{self.controlador.stock_disponible(producto.sku)} unidades"
+            text=f"Libre para traslado: {self.controlador.stock_disponible(producto.sku)} unidades"
         )
         self.boton_registrar.pack_forget()
         self.boton_guardar.pack(side="left", before=self.boton_limpiar)
-        self.boton_eliminar.pack(side="right")
         self.boton_ingresar.state(["!disabled"])
         self.zona_ingreso.grid()
 
@@ -311,6 +328,7 @@ class Productos(Pantalla):
             variable.set("")
         self.stock.set("0")
         self.tipo.set("Polera")
+        self.linea.set("Dama")
         self.talla.set("")
         for boton in self._botones_tipo:
             boton.state(["!disabled"])
@@ -323,7 +341,6 @@ class Productos(Pantalla):
         self._actualizar_tipo()
         self.boton_guardar.pack_forget()
         self.boton_registrar.pack(side="left", before=self.boton_limpiar)
-        self.boton_eliminar.pack_forget()
         self.boton_ingresar.state(["disabled"])
         self.zona_ingreso.grid_remove()
         if self.tabla.selection():
@@ -341,6 +358,7 @@ class Productos(Pantalla):
                 self.stock.get(),
                 self.talla.get(),
                 self.color.get(),
+                self.linea.get(),
                 self.extra.get(),
             )
         )
@@ -356,7 +374,8 @@ class Productos(Pantalla):
             return
         ok, producto = self.ejecutar(
             lambda: self.controlador.editar_producto(
-                self._sku, self.nombre.get(), self.foto.get(), self.talla.get(), self.color.get(), self.extra.get()
+                self._sku, self.nombre.get(), self.foto.get(), self.talla.get(), self.color.get(),
+                self.linea.get(), self.extra.get()
             )
         )
         if not ok:

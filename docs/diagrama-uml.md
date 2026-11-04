@@ -10,10 +10,13 @@ classDiagram
         -stock
         -talla
         -color
+        -linea
         -estado
         +tipo*
         +detalle*
         +tallas_validas()*
+        +tallas_infantiles()*
+        +tallas_para(linea)
         +actualizar_especifico(extra)*
         +validar_salida(cantidad)
         +descontar(cantidad)

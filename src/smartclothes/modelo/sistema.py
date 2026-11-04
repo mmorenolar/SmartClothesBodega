@@ -152,22 +152,22 @@ class SmartClothes:
     # ----- Productos -----
 
     def registrar_producto(self, tipo: str, sku: str, nombre: str, foto: str, stock: int, talla: str,
-                           color: str, extra: object = None) -> Producto:
-        producto = crear_producto(tipo, sku, nombre, foto, stock, talla, color, extra)
+                           color: str, linea: str, extra: object = None) -> Producto:
+        producto = crear_producto(tipo, sku, nombre, foto, stock, talla, color, linea, extra)
         if producto.sku in self._productos:
             raise ReglaNegocioError(f"Ya existe un producto con SKU {producto.sku}")
         self._productos[producto.sku] = producto
         self.guardar()
         return producto
 
-    def editar_producto(self, sku: str, nombre: str, foto: str, talla: str, color: str,
+    def editar_producto(self, sku: str, nombre: str, foto: str, talla: str, color: str, linea: str,
                         extra: object = None) -> Producto:
         producto = self.obtener_producto(sku)
         if isinstance(producto, Pantalon):
             extra = opcion(extra, Pantalon.CORTES, "Corte")
         elif isinstance(producto, Calzado):
             extra = opcion(extra, Calzado.ESTILOS, "Estilo")
-        producto.actualizar(nombre, foto, talla, color)
+        producto.actualizar(nombre, foto, talla, color, linea)
         producto.actualizar_especifico(extra)
         self.guardar()
         return producto

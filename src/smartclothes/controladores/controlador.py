@@ -7,7 +7,7 @@ from pathlib import Path
 
 from smartclothes.modelo.formato import pesos
 from smartclothes.modelo.errores import PersistenciaError, ReglaNegocioError
-from smartclothes.modelo.producto import TIPOS_PRODUCTO, Calzado, Pantalon, Producto
+from smartclothes.modelo.producto import LINEAS, TIPOS_PRODUCTO, Calzado, Pantalon, Producto
 from smartclothes.modelo.salida import MotivoMerma
 from smartclothes.modelo.sistema import SmartClothes
 from smartclothes.modelo.transporte import TRANSPORTES, transporte_por_nombre
@@ -36,9 +36,13 @@ class Controlador:
         return tuple(TIPOS_PRODUCTO)
 
     @staticmethod
-    def tallas_de(tipo: str) -> tuple[str, ...]:
+    def lineas() -> tuple[str, ...]:
+        return LINEAS
+
+    @staticmethod
+    def tallas_de(tipo: str, linea: str = "Hombre") -> tuple[str, ...]:
         clase = TIPOS_PRODUCTO.get(tipo.strip())
-        return clase.tallas_validas() if clase else ()
+        return clase.tallas_para(linea.strip()) if clase else ()
 
     @staticmethod
     def opciones_extra(tipo: str) -> tuple[str, tuple[str, ...]]:
@@ -82,11 +86,13 @@ class Controlador:
     def ordenes_de_tienda(self, codigo: str) -> int:
         return sum(1 for orden in self._sistema.listar_ordenes() if orden.tienda_codigo == codigo)
 
-    def buscar_productos(self, texto: str = "", tipo: str = "Todos") -> list:
-        """Filtra por texto (SKU, nombre o color) y por tipo de prenda o estado."""
+    def buscar_productos(self, texto: str = "", tipo: str = "Todos", linea: str = "Todas") -> list:
+        """Filtra por texto (SKU, nombre o color), por tipo de prenda o estado, y por línea."""
         buscado = texto.strip().lower()
         resultado = []
         for producto in self._sistema.listar_productos():
+            if linea not in ("", "Todas") and producto.linea != linea:
+                continue
             if tipo == "Agotados" and producto.disponible:
                 continue
             if tipo not in ("Todos", "Agotados") and producto.tipo_visible != tipo:
@@ -245,15 +251,15 @@ class Controlador:
     # ----- Productos -----
 
     def registrar_producto(self, tipo: str, sku: str, nombre: str, foto: str, stock: str, talla: str,
-                           color: str, extra: str):
+                           color: str, linea: str, extra: str):
         clave = self._tipo(tipo)
         return self._sistema.registrar_producto(
-            clave, sku, nombre, foto, self._entero(stock, "Stock inicial", 0), talla, color, extra
+            clave, sku, nombre, foto, self._entero(stock, "Stock inicial", 0), talla, color, linea, extra
         )
 
-    def editar_producto(self, sku: str, nombre: str, foto: str, talla: str, color: str, extra: str):
+    def editar_producto(self, sku: str, nombre: str, foto: str, talla: str, color: str, linea: str, extra: str):
         self._exigir(sku, "un producto")
-        return self._sistema.editar_producto(sku, nombre, foto, talla, color, extra)
+        return self._sistema.editar_producto(sku, nombre, foto, talla, color, linea, extra)
 
     def ingresar_stock(self, sku: str, cantidad: str):
         self._exigir(sku, "un producto")
