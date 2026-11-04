@@ -4,6 +4,10 @@ Aplicación de escritorio para administrar el inventario de la bodega principal 
 
 ## Ejecutar
 
+**En Windows, la forma más fácil:** descarga el proyecto (botón verde *Code → Download ZIP*), descomprímelo y haz doble clic en `Abrir Smart Clothes.bat`.
+
+También se puede instalar como paquete:
+
 Requiere Python 3.10 o superior (con Tkinter, que viene incluido en el instalador de python.org). Desde la carpeta del repositorio:
 
 ```bash
