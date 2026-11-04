@@ -22,7 +22,6 @@ from smartclothes.vista.comun import (
     separador,
 )
 
-FILTROS = ("Todos", "Pantalón", "Calzado", "Polera", "Agotados")
 
 
 class Productos(Pantalla):
@@ -50,7 +49,7 @@ class Productos(Pantalla):
         self.filtro = tk.StringVar(value="Todos")
         segmentos = tk.Frame(barra, bg=COLORES["tarjeta"])
         segmentos.pack(side="left", padx=16)
-        for texto in FILTROS:
+        for texto in ("Todos", *self.controlador.tipos_producto(), "Agotados"):
             ttk.Radiobutton(segmentos, text=texto, value=texto, variable=self.filtro, style="Segmento.Toolbutton",
                             command=self._llenar_tabla).pack(side="left", padx=(0, 4))
         self.filtro_linea = tk.StringVar(value="Todas las líneas")
@@ -118,8 +117,8 @@ class Productos(Pantalla):
         tipos.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(2, 6))
         self._botones_tipo = []
         for tipo in self.controlador.tipos_producto():
-            boton = ttk.Radiobutton(tipos, text=tipo, value=tipo, variable=self.tipo, style="Segmento.Toolbutton",
-                                    command=self._actualizar_tipo)
+            boton = ttk.Radiobutton(tipos, text=tipo, value=tipo, variable=self.tipo,
+                                    style="Chico.Segmento.Toolbutton", command=self._actualizar_tipo)
             boton.pack(side="left", fill="x", expand=True, padx=(0, 4))
             self._botones_tipo.append(boton)
 
@@ -302,7 +301,7 @@ class Productos(Pantalla):
         self.nombre.set(producto.nombre)
         self.talla.set(producto.talla)
         self.color.set(producto.color)
-        self.extra.set(getattr(producto, "corte", getattr(producto, "estilo", "")))
+        self.extra.set(producto.valor_especial)
         self.foto.set(producto.foto)
         self.stock.set(str(producto.stock))
         for boton in self._botones_tipo:

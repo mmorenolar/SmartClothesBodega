@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from smartclothes.modelo.errores import PersistenciaError, ReglaNegocioError
-from smartclothes.modelo.producto import Calzado, EstadoProducto, Pantalon, Polera, Producto
+from smartclothes.modelo.producto import Calzado, Chaqueta, EstadoProducto, Pantalon, Polera, Producto
 from smartclothes.modelo.salida import EstadoOrden, MotivoMerma, OrdenTraslado, RegistroMerma, SalidaBodega
 from smartclothes.modelo.sistema import SmartClothes
 from smartclothes.modelo.transporte import CamionLiviano, CamionPesado, Transporte
@@ -203,16 +203,34 @@ class ReglasTests(BodegaBase):
         self.sistema.editar_producto(nino.sku, "Polera Dino", "fotos/polera.png", "M", "Azul", "Hombre")
         self.assertEqual((nino.linea, nino.talla), ("Hombre", "M"))
 
+    def test_chaqueta_nueva_clase_hija_con_material(self):
+        chaqueta = self.sistema.registrar_producto(
+            "Chaqueta", "CHA-CUE-BU-M", "Chaqueta Cuero", "fotos/chaqueta.png", 4, "M", "Burdeo", "Dama",
+            "cuero sintético",
+        )
+        self.assertIsInstance(chaqueta, Chaqueta)
+        self.assertIsInstance(chaqueta, Producto)
+        self.assertEqual((chaqueta.material, chaqueta.detalle), ("Cuero sintético", "Material cuero sintético"))
+        self.sistema.editar_producto(chaqueta.sku, "Chaqueta Cuero", "fotos/chaqueta.png", "L", "Burdeo", "Dama",
+                                     "Cuero")
+        self.assertEqual((chaqueta.talla, chaqueta.valor_especial), ("L", "Cuero"))
+        orden = self.orden_con((chaqueta.sku, 4))
+        self.sistema.confirmar_orden(orden.folio, CamionLiviano())
+        self.assertIs(chaqueta.estado, EstadoProducto.AGOTADO)
+        recargado = SmartClothes(RepositorioJSON(self._temporal.name)).obtener_producto(chaqueta.sku)
+        self.assertEqual((type(recargado), recargado.material), (Chaqueta, "Cuero"))
+
     def test_validaciones_de_ficha(self):
         casos = (
             ("Polera", "POL-1", "Polera", "p.png", 1, "40", "Rojo", "Dama", None),
-            ("Pantalón", "PAN-1", "Jeans", "p.png", 1, "40", "Azul", "Hombre", "Ancho"),
+            ("Pantalón", "PAN-1", "Jeans", "p.png", 1, "40", "Azul", "Hombre", "Campana"),
             ("Calzado", "CAL-1", "Bota", "p.png", 1, "41", "Café", "Hombre", "Trekking"),
             ("Polera", "POL 1", "Polera", "p.png", 1, "M", "Rojo", "Dama", None),
             ("Polera", "POL-2", "Polera", "", 1, "M", "Rojo", "Dama", None),
             ("Polera", "POL-3", "Polera", "p.png", -1, "M", "Rojo", "Dama", None),
             ("Polera", "pol-bas-ne-m", "Repetida", "p.png", 1, "M", "Rojo", "Dama", None),
-            ("Chaqueta", "CHA-1", "Parka", "p.png", 1, "M", "Rojo", "Dama", None),
+            ("Bufanda", "BUF-1", "Bufanda", "p.png", 1, "M", "Rojo", "Dama", None),
+            ("Chaqueta", "CHA-1", "Parka", "p.png", 1, "M", "Rojo", "Dama", "Plástico"),
             ("Polera", "POL-4", "Polera", "p.png", 1, "M", "Rojo", "Mascotas", None),
             ("Polera", "POL-5", "Polera niño", "p.png", 1, "M", "Rojo", "Infantil", None),
             ("Calzado", "CAL-2", "Zapatilla niño", "p.png", 1, "41", "Azul", "Infantil", "Casual"),
@@ -326,7 +344,7 @@ class PersistenciaTests(BodegaBase):
         raiz = Path(__file__).resolve().parents[1] / "data"
         sistema = SmartClothes(RepositorioJSON(raiz))
         self.assertEqual(sistema.advertencias, ())
-        self.assertEqual(sistema.obtener_producto("PAN-SLIM-AZ-40").detalle, "Corte Slim")
+        self.assertEqual(sistema.obtener_producto("PAN-REG-AZ-40").detalle, "Corte Regular")
         self.assertEqual({producto.linea for producto in sistema.listar_productos()}, {"Dama", "Hombre", "Infantil"})
         self.assertIs(sistema.obtener_producto("POL-EST-RO-8").estado, EstadoProducto.AGOTADO)
         self.assertEqual(len(sistema.listar_tiendas()), 3)
@@ -366,7 +384,7 @@ class ControladorTests(unittest.TestCase):
         self.assertIn(merma.folio, destino.read_text(encoding="utf-8"))
 
     def test_importa_foto_a_la_carpeta_del_proyecto(self):
-        origen = Path(__file__).resolve().parents[1] / "data" / "fotos" / "jeans-slim-azul.png"
+        origen = sorted((Path(__file__).resolve().parents[1] / "data" / "fotos").glob("*.png"))[0]
         relativa = self.controlador.importar_foto(str(origen), "Jeans Ñandú Slim")
         self.assertTrue(relativa.startswith("fotos/jeans-nandu-slim"))
         self.assertTrue((Path(self._temporal.name) / relativa).exists())

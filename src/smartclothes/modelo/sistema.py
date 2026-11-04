@@ -8,9 +8,7 @@ from datetime import date
 
 from smartclothes.modelo.errores import ReglaNegocioError
 from smartclothes.modelo.producto import (
-    Calzado,
     EstadoProducto,
-    Pantalon,
     Producto,
     crear_producto,
     producto_desde_diccionario,
@@ -163,10 +161,9 @@ class SmartClothes:
     def editar_producto(self, sku: str, nombre: str, foto: str, talla: str, color: str, linea: str,
                         extra: object = None) -> Producto:
         producto = self.obtener_producto(sku)
-        if isinstance(producto, Pantalon):
-            extra = opcion(extra, Pantalon.CORTES, "Corte")
-        elif isinstance(producto, Calzado):
-            extra = opcion(extra, Calzado.ESTILOS, "Estilo")
+        etiqueta, opciones = producto.opciones_extra()  # cada prenda sabe cuál es su atributo especial
+        if etiqueta:
+            extra = opcion(extra, opciones, etiqueta)
         producto.actualizar(nombre, foto, talla, color, linea)
         producto.actualizar_especifico(extra)
         self.guardar()

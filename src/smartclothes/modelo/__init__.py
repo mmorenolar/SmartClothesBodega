@@ -1,7 +1,7 @@
 """Modelo de dominio. No importa Tkinter."""
 
 from smartclothes.modelo.errores import PersistenciaError, ReglaNegocioError
-from smartclothes.modelo.producto import Calzado, EstadoProducto, Pantalon, Polera, Producto
+from smartclothes.modelo.producto import Calzado, Chaqueta, EstadoProducto, Pantalon, Polera, Producto
 from smartclothes.modelo.salida import (
     DetalleTraslado,
     EstadoOrden,
@@ -15,6 +15,7 @@ from smartclothes.modelo.tienda import Tienda
 
 __all__ = [
     "Calzado",
+    "Chaqueta",
     "DetalleTraslado",
     "EstadoOrden",
     "EstadoProducto",

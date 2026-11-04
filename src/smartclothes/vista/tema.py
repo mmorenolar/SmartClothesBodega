@@ -116,6 +116,9 @@ def aplicar(raiz: tk.Tk) -> None:
                foreground=[("selected", "#ffffff"), ("disabled", "#b4bac4")],
                bordercolor=[("selected", c["acento"])])
 
+    # Variante compacta para cuando hay muchas opciones en poco espacio (hereda colores de Segmento)
+    estilo.configure("Chico.Segmento.Toolbutton", padding=(4, 6))
+
     # Campos de texto y listas desplegables
     for clase in ("TEntry", "TCombobox", "TSpinbox"):
         estilo.configure(clase, fieldbackground=c["tarjeta"], background=c["tarjeta"], bordercolor=c["borde"],

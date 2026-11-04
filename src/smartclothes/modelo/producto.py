@@ -113,6 +113,16 @@ class Producto(ABC):
         """La línea Infantil usa tallas de niño; Dama y Hombre, tallas de adulto."""
         return cls.tallas_infantiles() if linea == "Infantil" else cls.tallas_validas()
 
+    @classmethod
+    def opciones_extra(cls) -> tuple[str, tuple[str, ...]]:
+        """Nombre y valores permitidos del atributo especial. Por defecto la prenda no tiene."""
+        return "", ()
+
+    @property
+    def valor_especial(self) -> str:
+        """Valor del atributo especial (corte, estilo, material) o vacío."""
+        return next(iter(self._extras().values()), "")
+
     @abstractmethod
     def actualizar_especifico(self, extra: object) -> None:
         """Actualiza el corte o el estilo. La polera no tiene dato extra."""
@@ -187,7 +197,7 @@ class Producto(ABC):
 
 
 class Pantalon(Producto):
-    CORTES = ("Slim", "Regular", "Skinny")
+    CORTES = ("Slim", "Regular", "Skinny", "Ancho")
     TALLAS = ("36", "38", "40", "42", "44", "46", "48", "50")
     TALLAS_INFANTILES = ("2", "4", "6", "8", "10", "12", "14", "16")
 
@@ -207,6 +217,10 @@ class Pantalon(Producto):
     @property
     def corte(self) -> str:
         return self._corte
+
+    @classmethod
+    def opciones_extra(cls) -> tuple[str, tuple[str, ...]]:
+        return "Corte", cls.CORTES
 
     @property
     def detalle(self) -> str:
@@ -248,6 +262,10 @@ class Calzado(Producto):
     @property
     def estilo(self) -> str:
         return self._estilo
+
+    @classmethod
+    def opciones_extra(cls) -> tuple[str, tuple[str, ...]]:
+        return "Estilo", cls.ESTILOS
 
     @property
     def detalle(self) -> str:
@@ -301,10 +319,65 @@ class Polera(Producto):
         return {}
 
 
+class Chaqueta(Producto):
+    """Agrega el material. Se sumó al sistema sin modificar las otras prendas."""
+
+    MATERIALES = ("Cuero sintético", "Cuero", "Mezclilla", "Algodón", "Poliéster", "Lana")
+    TALLAS = ("XS", "S", "M", "L", "XL", "XXL")
+    TALLAS_INFANTILES = ("2", "4", "6", "8", "10", "12", "14", "16")
+
+    def __init__(self, sku: str, nombre: str, foto: str, stock: int, talla: str, color: str, linea: str,
+                 material: str):
+        super().__init__(sku, nombre, foto, stock, talla, color, linea)
+        self._material = opcion(material, self.MATERIALES, "Material")
+
+    @property
+    def tipo(self) -> str:
+        return "chaqueta"
+
+    @property
+    def tipo_visible(self) -> str:
+        return "Chaqueta"
+
+    @property
+    def material(self) -> str:
+        return self._material
+
+    @classmethod
+    def opciones_extra(cls) -> tuple[str, tuple[str, ...]]:
+        return "Material", cls.MATERIALES
+
+    @property
+    def detalle(self) -> str:
+        return f"Material {self._material.lower()}"
+
+    @classmethod
+    def tallas_validas(cls) -> tuple[str, ...]:
+        return cls.TALLAS
+
+    @classmethod
+    def tallas_infantiles(cls) -> tuple[str, ...]:
+        return cls.TALLAS_INFANTILES
+
+    def actualizar_especifico(self, extra: object) -> None:
+        self._material = opcion(extra, self.MATERIALES, "Material")
+
+    def _extras(self) -> dict:
+        return {"material": self._material}
+
+
+# Para sumar un tipo de prenda: crear su clase arriba y agregarla en estos dos diccionarios.
 TIPOS_PRODUCTO: dict[str, type[Producto]] = {
     "Pantalón": Pantalon,
     "Calzado": Calzado,
     "Polera": Polera,
+    "Chaqueta": Chaqueta,
+}
+CLAVES_PRODUCTO: dict[str, type[Producto]] = {
+    "pantalon": Pantalon,
+    "calzado": Calzado,
+    "polera": Polera,
+    "chaqueta": Chaqueta,
 }
 
 
@@ -312,9 +385,10 @@ def crear_producto(tipo: str, sku: str, nombre: str, foto: str, stock: int, tall
                    linea: str, extra: object = None) -> Producto:
     clase = TIPOS_PRODUCTO.get(tipo)
     if clase is None:
-        raise ReglaNegocioError("El producto debe ser Pantalón, Calzado o Polera")
-    if clase is Polera:
-        return Polera(sku, nombre, foto, stock, talla, color, linea)
+        raise ReglaNegocioError(f"El producto debe ser {', '.join(TIPOS_PRODUCTO)}")
+    etiqueta, _opciones = clase.opciones_extra()
+    if not etiqueta:
+        return clase(sku, nombre, foto, stock, talla, color, linea)
     return clase(sku, nombre, foto, stock, talla, color, linea, extra)
 
 
@@ -332,14 +406,14 @@ def producto_desde_diccionario(datos: dict) -> Producto:
             datos["color"],
             datos["linea"],
         )
-        if tipo == "pantalon":
-            producto: Producto = Pantalon(*comunes, datos["corte"])
-        elif tipo == "calzado":
-            producto = Calzado(*comunes, datos["estilo"])
-        elif tipo == "polera":
-            producto = Polera(*comunes)
-        else:
+        clase = CLAVES_PRODUCTO.get(tipo)
+        if clase is None:
             raise ReglaNegocioError("Tipo de producto desconocido")
+        etiqueta, _opciones = clase.opciones_extra()
+        if etiqueta:
+            producto: Producto = clase(*comunes, datos[etiqueta.lower()])
+        else:
+            producto = clase(*comunes)
     except KeyError as error:
         raise ReglaNegocioError("Producto guardado incompleto") from error
     if "estado" in datos and datos["estado"] != producto.estado.value:

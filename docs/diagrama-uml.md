@@ -18,6 +18,7 @@ classDiagram
         +tallas_infantiles()*
         +tallas_para(linea)
         +actualizar_especifico(extra)*
+        +opciones_extra()
         +validar_salida(cantidad)
         +descontar(cantidad)
         +reponer(cantidad)
@@ -30,6 +31,9 @@ classDiagram
         -estilo
     }
     class Polera
+    class Chaqueta {
+        -material
+    }
     class EstadoProducto {
         <<enumeration>>
         DISPONIBLE
@@ -38,6 +42,7 @@ classDiagram
     Producto <|-- Pantalon
     Producto <|-- Calzado
     Producto <|-- Polera
+    Producto <|-- Chaqueta
     Producto --> EstadoProducto
 
     class SalidaBodega {

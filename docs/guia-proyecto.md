@@ -29,6 +29,6 @@ Modelar la bodega principal de Smart Clothes con clases, encapsulamiento, abstra
 ## Preguntas que pueden hacer
 
 - ¿Por qué el stock y el estado no tienen setter? Porque el caso exige que solo cambien mediante métodos encapsulados del backend.
-- ¿Qué archivo hay que tocar para agregar un tipo de prenda (por ejemplo, Chaqueta)? Solo `producto.py`: una subclase nueva y su entrada en `TIPOS_PRODUCTO`.
+- ¿Qué archivo hay que tocar para agregar un tipo de prenda? Solo `producto.py`: una subclase nueva y su entrada en `TIPOS_PRODUCTO` y `CLAVES_PRODUCTO`. Así se agregó `Chaqueta`: el sistema, el controlador y las pantallas la reconocen solos, porque le preguntan a cada clase su atributo especial con `opciones_extra()`.
 - ¿Por qué el comprobante no cambia si después edito la prenda? `DetalleTraslado` copia los datos al momento de agregar la línea.
 - ¿Cuándo se descuenta el stock de un traslado? Al confirmar, no al agregar. Mientras está en borrador queda reservado para que dos órdenes no prometan las mismas unidades.

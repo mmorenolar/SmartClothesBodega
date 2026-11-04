@@ -7,7 +7,7 @@ from pathlib import Path
 
 from smartclothes.modelo.formato import pesos
 from smartclothes.modelo.errores import PersistenciaError, ReglaNegocioError
-from smartclothes.modelo.producto import LINEAS, TIPOS_PRODUCTO, Calzado, Pantalon, Producto
+from smartclothes.modelo.producto import LINEAS, TIPOS_PRODUCTO, Producto
 from smartclothes.modelo.salida import MotivoMerma
 from smartclothes.modelo.sistema import SmartClothes
 from smartclothes.modelo.transporte import TRANSPORTES, transporte_por_nombre
@@ -47,12 +47,8 @@ class Controlador:
     @staticmethod
     def opciones_extra(tipo: str) -> tuple[str, tuple[str, ...]]:
         """Etiqueta y valores del atributo especial. La polera no tiene."""
-        clave = tipo.strip()
-        if clave == "Pantalón":
-            return "Corte", Pantalon.CORTES
-        if clave == "Calzado":
-            return "Estilo", Calzado.ESTILOS
-        return "", ()
+        clase = TIPOS_PRODUCTO.get(tipo.strip())
+        return clase.opciones_extra() if clase else ("", ())
 
     @staticmethod
     def transportes() -> tuple[str, ...]:
