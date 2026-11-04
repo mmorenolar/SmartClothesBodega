@@ -35,7 +35,7 @@ smartclothes-demo
 Menú lateral con seis módulos (también con **Ctrl + 1 … 6**):
 
 - **Inicio:** indicadores que suben contando, prendas agotadas o con stock bajo (clic para reponer) y últimos documentos.
-- **Productos:** buscador, filtros por tipo o agotados, tabla con fotos y ficha lateral para crear, editar e ingresar unidades.
+- **Productos:** buscador, filtros por tipo, línea o agotados, galería de tarjetas con foto, nombre, SKU y estado; al hacer clic en una prenda se abre su ficha para editarla o ingresar unidades.
 - **Tiendas:** tabla y ficha para crear o editar.
 - **Órdenes de traslado:** tres pasos (prendas → transporte → confirmar). Cada camión se muestra como tarjeta con costo y ocupación, y se sugiere el más conveniente.
 - **Mermas y pérdidas:** formulario guiado con ficha de la prenda, motivo en botones y contador de caracteres.

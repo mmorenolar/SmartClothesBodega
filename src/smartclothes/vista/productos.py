@@ -1,4 +1,4 @@
-"""Productos: buscador, tabla con fotos y panel lateral para crear, editar e ingresar stock."""
+"""Productos: buscador, galería de tarjetas con fotos y ficha lateral para crear, editar e ingresar stock."""
 
 import tkinter as tk
 from tkinter import filedialog, ttk
@@ -11,27 +11,24 @@ from smartclothes.vista.comun import (
     cargar_miniatura,
     chip,
     chip_estado_producto,
-    crear_tabla,
     encabezado,
     etiqueta_campo,
-    fila,
     informar,
     mostrar_error,
     pedir_confirmacion,
     pintar_chip,
     separador,
 )
-
+from smartclothes.vista.galeria import Galeria
 
 
 class Productos(Pantalla):
     def __init__(self, master, controlador):
         super().__init__(master, controlador)
         self._sku: str | None = None
-        self._miniaturas: dict[str, tk.PhotoImage] = {}
         self._vista_previa: tk.PhotoImage | None = None
 
-        cabecera = encabezado(self, "Productos", "Prendas en bodega. Haz clic en una fila para ver su ficha.")
+        cabecera = encabezado(self, "Productos", "Prendas en bodega. Haz clic en una prenda para ver y editar su ficha.")
         ttk.Button(cabecera, text="+  Nueva prenda", style="Primario.TButton", command=self.limpiar).pack(
             side="right"
         )
@@ -64,18 +61,11 @@ class Productos(Pantalla):
         cuerpo.columnconfigure(0, weight=1)
         cuerpo.rowconfigure(0, weight=1)
 
-        tarjeta_tabla = Tarjeta(cuerpo, padding=8)
-        tarjeta_tabla.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
-        marco, self.tabla = crear_tabla(
-            tarjeta_tabla,
-            ("sku", "nombre", "linea", "talla", "color", "stock", "estado"),
-            ("SKU", "Prenda", "Línea", "Talla", "Color", "Stock", "Estado"),
-            (126, 114, 62, 46, 56, 50, 98),
-            altura=7,
-            con_imagen=True,
-        )
-        marco.pack(fill="both", expand=True)
-        self.tabla.bind("<<TreeviewSelect>>", self.al_seleccionar)
+        tarjeta_galeria = Tarjeta(cuerpo, padding=4)
+        tarjeta_galeria.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
+        self.tabla = Galeria(tarjeta_galeria)
+        self.tabla.pack(fill="both", expand=True)
+        self.tabla.bind("<<Seleccion>>", self.al_seleccionar)
 
         self._crear_panel(cuerpo)
         self.limpiar()
@@ -257,22 +247,12 @@ class Productos(Pantalla):
                                                       "Todas" if linea.startswith("Todas") else linea)
         total = len(self.controlador.listar_productos())
         self.tabla.delete(*self.tabla.get_children())
-        self._miniaturas.clear()
         for producto in productos:
-            imagen = cargar_miniatura(self.controlador.ruta_foto(producto.foto), 48)
-            opciones = {"image": imagen} if imagen else {"text": "—"}
-            if imagen:
-                self._miniaturas[producto.sku] = imagen
+            imagen = cargar_miniatura(self.controlador.ruta_foto(producto.foto), 96)
             estado, tipo = chip_estado_producto(producto)
-            nombre = producto.nombre
-            fila(
-                self.tabla,
-                producto.sku,
-                (producto.sku, nombre, producto.linea, producto.talla, producto.color, producto.stock,
-                 f"●  {estado}"),
-                tags=(tipo,) if tipo != "exito" else (),
-                **opciones,
-            )
+            if producto.disponible:
+                estado = f"{estado} · {producto.stock}"
+            self.tabla.agregar(producto.sku, imagen, producto.nombre, estado, tipo)
         self.contador.configure(text=f"Mostrando {len(productos)} de {total} prendas")
         if self._sku and self.tabla.exists(self._sku):
             self.tabla.selection_set(self._sku)
