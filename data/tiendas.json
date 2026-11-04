@@ -1,0 +1,17 @@
+[
+  {
+    "codigo": "T-CENTRO",
+    "nombre": "Smart Clothes Centro",
+    "direccion": "Ahumada 120, Santiago"
+  },
+  {
+    "codigo": "T-PROVI",
+    "nombre": "Smart Clothes Providencia",
+    "direccion": "Av. Providencia 2150, Providencia"
+  },
+  {
+    "codigo": "T-MAIPU",
+    "nombre": "Smart Clothes Maipú",
+    "direccion": "Av. Pajaritos 1800, Maipú"
+  }
+]

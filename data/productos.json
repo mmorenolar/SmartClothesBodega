@@ -1,34 +1,98 @@
 [
   {
-    "id": "prod-hamburguesa",
-    "tipo": "comida",
-    "nombre": "Hamburguesa",
-    "precio": 6500,
-    "stock": 24,
-    "categoria": "Sándwich"
+    "sku": "POL-BAS-BL-M",
+    "tipo": "polera",
+    "nombre": "Polera Básica",
+    "foto": "fotos/polera-basica-blanca.png",
+    "stock": 420,
+    "talla": "M",
+    "color": "Blanco",
+    "estado": "DISPONIBLE"
   },
   {
-    "id": "prod-papas",
-    "tipo": "comida",
-    "nombre": "Papas fritas",
-    "precio": 2500,
-    "stock": 38,
-    "categoria": "Acompañamiento"
+    "sku": "POL-BAS-NE-L",
+    "tipo": "polera",
+    "nombre": "Polera Básica",
+    "foto": "fotos/polera-basica-negra.png",
+    "stock": 310,
+    "talla": "L",
+    "color": "Negro",
+    "estado": "DISPONIBLE"
   },
   {
-    "id": "prod-cola",
-    "tipo": "bebida",
-    "nombre": "Bebida cola",
-    "precio": 1500,
-    "stock": 48,
-    "mililitros": 350
+    "sku": "POL-EST-RO-S",
+    "tipo": "polera",
+    "nombre": "Polera Estampada",
+    "foto": "fotos/polera-estampada-roja.png",
+    "stock": 0,
+    "talla": "S",
+    "color": "Rojo",
+    "estado": "AGOTADO"
   },
   {
-    "id": "prod-jugo",
-    "tipo": "bebida",
-    "nombre": "Jugo natural",
-    "precio": 2000,
-    "stock": 20,
-    "mililitros": 400
+    "sku": "PAN-SLIM-AZ-40",
+    "tipo": "pantalon",
+    "nombre": "Jeans Slim",
+    "foto": "fotos/jeans-slim-azul.png",
+    "stock": 180,
+    "talla": "40",
+    "color": "Azul",
+    "estado": "DISPONIBLE",
+    "corte": "Slim"
+  },
+  {
+    "sku": "PAN-REG-BE-42",
+    "tipo": "pantalon",
+    "nombre": "Chino Regular",
+    "foto": "fotos/chino-regular-beige.png",
+    "stock": 95,
+    "talla": "42",
+    "color": "Beige",
+    "estado": "DISPONIBLE",
+    "corte": "Regular"
+  },
+  {
+    "sku": "PAN-SKI-NE-38",
+    "tipo": "pantalon",
+    "nombre": "Jeans Skinny",
+    "foto": "fotos/jeans-skinny-negro.png",
+    "stock": 12,
+    "talla": "38",
+    "color": "Negro",
+    "estado": "DISPONIBLE",
+    "corte": "Skinny"
+  },
+  {
+    "sku": "CAL-DEP-BL-41",
+    "tipo": "calzado",
+    "nombre": "Zapatilla Runner",
+    "foto": "fotos/zapatilla-runner-blanca.png",
+    "stock": 140,
+    "talla": "41",
+    "color": "Blanco",
+    "estado": "DISPONIBLE",
+    "estilo": "Deportivo"
+  },
+  {
+    "sku": "CAL-CAS-CA-40",
+    "tipo": "calzado",
+    "nombre": "Zapatilla Urbana",
+    "foto": "fotos/zapatilla-urbana-cafe.png",
+    "stock": 60,
+    "talla": "40",
+    "color": "Café",
+    "estado": "DISPONIBLE",
+    "estilo": "Casual"
+  },
+  {
+    "sku": "CAL-FOR-NE-42",
+    "tipo": "calzado",
+    "nombre": "Zapato Oxford",
+    "foto": "fotos/zapato-oxford-negro.png",
+    "stock": 8,
+    "talla": "42",
+    "color": "Negro",
+    "estado": "DISPONIBLE",
+    "estilo": "Formal"
   }
 ]

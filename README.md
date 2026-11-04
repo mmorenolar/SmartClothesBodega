@@ -1,81 +1,86 @@
-# FlashFood — Operación 13:00
+# Smart Clothes — Bodega principal y traslados
 
-Aplicación de escritorio para administrar productos, clientes, pedidos, pagos y repartidores de FlashFood. El caso aplica abstracción, encapsulamiento, herencia y polimorfismo, con arquitectura MVC y persistencia en JSON.
+Aplicación de escritorio para administrar el inventario de la bodega principal de Smart Clothes: prendas (pantalones, calzado y poleras), tiendas destino, órdenes de traslado con comprobante y registro de mermas. El caso aplica abstracción, encapsulamiento, herencia y polimorfismo, con arquitectura MVC y persistencia en JSON.
 
 ## Ejecutar
 
-Requiere Python 3.12 o superior. Desde la carpeta del repositorio:
+Requiere Python 3.10 o superior (con Tkinter, que viene incluido en el instalador de python.org). Desde la carpeta del repositorio:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-flashfood
+smartclothes
 ```
 
 En Windows: `.venv\Scripts\Activate.ps1`.
 
-La ventana abre los datos de `data/`. Cada operación vuelve a guardar productos, clientes, repartidores, pedidos y las condiciones de despacho.
+También funciona sin instalar: `python -m smartclothes` desde la carpeta `src`, o con `PYTHONPATH=src`.
+
+La ventana abre los datos de `data/`. Cada operación vuelve a guardar productos, tiendas, traslados, mermas y los folios.
 
 ```bash
 python -m unittest discover -s tests -v
-flashfood-demo
+smartclothes-demo
 ```
 
-`flashfood-demo` recorre registro, pago rechazado, pago aprobado, preparación, despacho y entrega sin abrir ventanas.
+`smartclothes-demo` recorre registro de prendas, una orden rechazada por stock, la cotización de los dos camiones, un camión pesado rechazado por carga mínima, la confirmación con comprobante, el cambio a Agotado y una merma, sin abrir ventanas.
 
 ## Pantallas
 
-Inicio, Productos, Clientes, Pedidos, Detalle del pedido, Pagos, Repartidores y Seguimiento. El menú **Módulos** cambia de pantalla. Las tablas usan `ttk.Treeview` y los avisos usan `messagebox`.
+Inicio, Productos, Tiendas, Órdenes de traslado, Mermas y pérdidas, y Comprobantes. El menú **Módulos** cambia de pantalla. Las tablas usan `ttk.Treeview` (con miniatura de la foto) y los avisos usan `messagebox`.
 
 ## Estados
 
 ```text
-CREADO → PAGADO → EN_PREPARACION → EN_CAMINO → ENTREGADO
-   └──────────────→ CANCELADO
+Producto:          DISPONIBLE ⇄ AGOTADO      (lo decide el stock, nunca el usuario)
+
+Orden de traslado: BORRADOR → CONFIRMADA
+                       └────→ ANULADA
 ```
 
-Se puede cancelar en Creado, Pagado y En preparación. En camino y Entregado no se cancelan. El pedido entregado no vuelve a cambiar.
+Una orden se edita solo en Borrador. Confirmada es final: las prendas ya salieron de bodega.
 
 ## Reglas
 
-1. No se agrega una cantidad mayor que el stock disponible, contando lo ya comprometido en otros pedidos creados.
-2. El stock nunca queda negativo.
-3. Un pedido puede tener varias líneas. El precio de cada línea queda congelado al agregarla.
-4. El total es subtotal − descuento + despacho. El despacho base es $2.000. En hora punta sube 25%. Con lluvia se suman $1.000. Un cliente VIP tiene 10% de descuento sobre el subtotal.
-5. Un pedido no se paga dos veces. Un pago rechazado no confirma la compra ni descuenta inventario.
-6. El stock se descuenta solo cuando el pago queda aprobado, y una sola vez. Si ese descuento no puede completarse, el cobro se anula.
-7. Cancelar un pedido pagado restituye el stock una sola vez y libera al repartidor si ya estaba asignado.
-8. Un repartidor no tiene dos entregas activas. Se asigna con el pedido en preparación y queda libre al entregar o al cancelar.
-9. Una operación inválida muestra el error y la aplicación sigue abierta.
+1. Toda prenda tiene SKU, nombre, foto, stock, talla, color y estado. El pantalón agrega **corte** (Slim, Regular, Skinny), el calzado agrega **estilo** (Deportivo, Casual, Formal) y la polera no agrega nada.
+2. Cada tipo de prenda valida su propia tabla de tallas: polera XS–XXL, pantalón 36–50, calzado 35–46.
+3. El SKU es único, en mayúsculas, con letras, números y guiones.
+4. Una orden de traslado lleva fecha de despacho (no anterior a hoy), tienda destino y prendas elegidas por SKU con su cantidad.
+5. No se agrega una cantidad mayor que el stock, contando lo ya reservado en otras órdenes en borrador. La prenda debe estar **Disponible**.
+6. Al confirmar se vuelve a validar todo y se descuenta el stock de inmediato. Si una línea falla, no se descuenta ninguna.
+7. Si el stock llega a cero, el estado cambia solo a **Agotado**. Un ingreso a bodega lo devuelve a **Disponible**.
+8. Al confirmar se elige el **transporte**. El **camión 3/4 (liviano)** lleva hasta 300 prendas: $35.000 de tarifa base más $120 por prenda. El **camión pesado** lleva de 200 a 3.000 prendas: $120.000 de tarifa base más $40 por prenda; no sale con menos de 200 porque no conviene moverlo casi vacío. La pantalla cotiza los dos y sugiere el más barato que sirve. Si el camión elegido no sirve para la carga, la orden no se confirma y no se descuenta nada.
+9. La confirmación emite un comprobante con folio único (`OT-000001`), fecha de despacho, tienda destino, cada prenda con SKU, foto, nombre, talla, color y cantidad, y el transporte con su ocupación y costo.
+10. Una merma pide SKU, cantidad, motivo (Daño, Pérdida, Falla de fábrica) y una observación de al menos 10 caracteres. Descuenta en el momento, puede agotar la prenda y emite un Registro de Merma con folio propio (`ME-000001`).
+11. El stock y el estado **no se editan a mano**: solo cambian con `Producto.descontar()` y `Producto.reponer()`. Editar la ficha no toca el stock.
+12. No se elimina una prenda con traslados o mermas, ni una tienda con órdenes.
+13. Una operación inválida muestra el error y la aplicación sigue abierta.
 
 ## Pilares de POO
 
 | Pilar | Dónde se ve |
 | --- | --- |
-| Abstracción | `Producto` y `MetodoPago` son clases abstractas (`abc`). No se instancian. |
-| Encapsulamiento | El estado, el stock y el pago se cambian con métodos. No hay setters públicos. |
-| Herencia | `Comida` y `Bebida` especializan `Producto`. `PagoTarjeta`, `PagoEfectivo`, `PagoBilletera` y `PagoTransferencia` especializan `MetodoPago`. |
-| Polimorfismo | `Pedido.cobrar` llama a `procesar` sin saber qué medio concreto recibió. |
-| Composición | Un `Pedido` contiene varios `DetallePedido`. |
-
-`PagoTransferencia` se agregó implementando `MetodoPago`. Las otras clases de pago no se modifican para aceptarla.
+| Abstracción | `Producto`, `SalidaBodega` y `Transporte` son clases abstractas (`abc`). No se instancian. |
+| Encapsulamiento | Stock y estado sin setters. Cambian solo con `descontar()` y `reponer()`; el estado se recalcula en el método privado `__actualizar_estado()`. |
+| Herencia | `Pantalon`, `Calzado` y `Polera` especializan `Producto`. `OrdenTraslado` y `RegistroMerma` especializan `SalidaBodega`. `CamionLiviano` y `CamionPesado` especializan `Transporte`. |
+| Polimorfismo | `OrdenTraslado.cotizar` llama a `transporte.planificar()` sin saber qué camión recibió: cada uno responde con su capacidad, su carga mínima y su tarifa. `SmartClothes._aplicar_salida` recorre `lineas()` y `emitir_comprobante` llama a `comprobante()` sin saber si recibió un traslado o una merma. `detalle` y `tallas_validas()` cambian según la prenda. |
+| Composición | Una `OrdenTraslado` contiene varios `DetalleTraslado`. |
 
 ## Estructura
 
 ```text
-src/flashfood/modelo/          entidades, reglas y FlashFood
-src/flashfood/persistencia/    lectura y escritura JSON
-src/flashfood/controladores/   traducción de la interfaz al modelo
-src/flashfood/vista/           ventanas Tkinter y ttk
-data/                          datos de ejemplo
-tests/                         reglas, persistencia y recorrido de pantallas
+src/smartclothes/modelo/          entidades, reglas y SmartClothes
+src/smartclothes/persistencia/    lectura y escritura JSON
+src/smartclothes/controladores/   traducción de la interfaz al modelo
+src/smartclothes/vista/           ventanas Tkinter y ttk
+data/                             datos de ejemplo y fotos de las prendas
+tests/                            reglas, persistencia y recorrido de pantallas
 ```
 
-El modelo no importa Tkinter. Las pantallas no deciden stock, totales ni transiciones.
+El modelo no importa Tkinter. Las pantallas no descuentan stock ni deciden estados.
 
 ## Documentación
 
 - [Diagrama de clases](docs/diagrama-uml.md)
-- [Guía docente](docs/guia-docente.md)
-- [Especificación](FlashFood_Operacion_1300_Requerimientos.md)
+- [Guía del proyecto](docs/guia-proyecto.md)

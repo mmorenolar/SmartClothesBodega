@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "flashfood-poo"
+name = "smartclothes-poo"
 version = "1.0.0"
-description = "Operación 13:00 de FlashFood: pedidos, pagos y reparto con POO, MVC y JSON"
-requires-python = ">=3.12"
+description = "Smart Clothes: control de bodega, órdenes de traslado y mermas con POO, MVC y JSON"
+requires-python = ">=3.10"
 
 [project.scripts]
-flashfood = "flashfood.__main__:main"
-flashfood-demo = "flashfood.demo:main"
+smartclothes = "smartclothes.__main__:main"
+smartclothes-demo = "smartclothes.demo:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
