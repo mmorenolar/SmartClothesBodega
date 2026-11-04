@@ -314,9 +314,23 @@ class ComboBuscador(ttk.Combobox):
         self["values"] = [valor for valor in self._opciones if texto in valor.lower()] or self._opciones
 
 
-def cargar_miniatura(ruta: Path | None, lado: int) -> tk.PhotoImage | None:
-    """Carga PNG o GIF y la reduce para que quepa en un cuadrado de `lado` píxeles."""
+def cargar_miniatura(ruta: Path | None, lado: int):
+    """Carga la foto y la reduce para que quepa en un cuadrado de `lado` píxeles.
+
+    Con Pillow instalado acepta JPG y achica con mejor calidad; si no, usa PNG o GIF.
+    """
     if ruta is None:
+        return None
+    try:
+        from PIL import Image, ImageTk
+
+        with Image.open(ruta) as imagen:
+            imagen = imagen.copy()
+        imagen.thumbnail((lado, lado), Image.LANCZOS)
+        return ImageTk.PhotoImage(imagen)
+    except ImportError:
+        pass
+    except (OSError, tk.TclError):
         return None
     try:
         imagen = tk.PhotoImage(file=str(ruta))

@@ -41,6 +41,8 @@ Menú lateral con seis módulos (también con **Ctrl + 1 … 6**):
 - **Mermas y pérdidas:** formulario guiado con ficha de la prenda, motivo en botones y contador de caracteres.
 - **Comprobantes:** listado filtrable y vista del documento; al confirmar un traslado, un camión cruza la pantalla.
 
+**Fotos:** en la ficha de la prenda, *Elegir imagen…* acepta JPG, PNG, GIF, WEBP o BMP. La foto se achica y se copia como PNG a `data/fotos`, así viaja con el proyecto. Para JPG se usa la librería Pillow, que `Abrir Smart Clothes.bat` instala sola la primera vez.
+
 Los avisos aparecen en la esquina y se van solos; las acciones que no se pueden deshacer piden confirmación. Los colores y fuentes de toda la app están en `src/smartclothes/vista/tema.py`.
 
 ## Estados

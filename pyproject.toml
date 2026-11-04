@@ -7,6 +7,7 @@ name = "smartclothes-poo"
 version = "1.0.0"
 description = "Smart Clothes: control de bodega, órdenes de traslado y mermas con POO, MVC y JSON"
 requires-python = ">=3.10"
+dependencies = ["pillow>=10"]
 
 [project.scripts]
 smartclothes = "smartclothes.__main__:main"

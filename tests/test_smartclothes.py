@@ -343,6 +343,28 @@ class ControladorTests(unittest.TestCase):
         self.controlador.exportar_comprobante(merma.folio, str(destino))
         self.assertIn(merma.folio, destino.read_text(encoding="utf-8"))
 
+    def test_importa_foto_a_la_carpeta_del_proyecto(self):
+        origen = Path(__file__).resolve().parents[1] / "data" / "fotos" / "jeans-slim-azul.png"
+        relativa = self.controlador.importar_foto(str(origen), "Jeans Ñandú Slim")
+        self.assertTrue(relativa.startswith("fotos/jeans-nandu-slim"))
+        self.assertTrue((Path(self._temporal.name) / relativa).exists())
+        segunda = self.controlador.importar_foto(str(origen), "Jeans Ñandú Slim")
+        self.assertNotEqual(relativa, segunda, "No debe pisar una foto existente")
+        with self.assertRaises(ReglaNegocioError):
+            self.controlador.importar_foto(__file__, "texto")
+
+    def test_importa_foto_jpg_como_png(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("Pillow no está instalado")
+        origen = Path(self._temporal.name) / "celular.jpg"
+        Image.new("RGB", (1200, 900), (180, 40, 40)).save(origen, "JPEG")
+        relativa = self.controlador.importar_foto(str(origen), "POL-ROJA-M")
+        self.assertEqual(relativa, "fotos/pol-roja-m.png")
+        with Image.open(Path(self._temporal.name) / relativa) as guardada:
+            self.assertLessEqual(max(guardada.size), self.controlador.LADO_FOTO)
+
 
 class SeparacionTests(unittest.TestCase):
     def test_modelo_persistencia_y_controlador_no_importan_tkinter(self):

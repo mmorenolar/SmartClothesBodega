@@ -1,5 +1,8 @@
 """Traduce la interfaz al modelo. No dibuja ventanas ni decide el stock."""
 
+import re
+import shutil
+import unicodedata
 from pathlib import Path
 
 from smartclothes.modelo.formato import pesos
@@ -164,6 +167,71 @@ class Controlador:
             return Path(ruta).resolve().relative_to(self._directorio.resolve()).as_posix()
         except ValueError:
             return ruta
+
+    FORMATOS_FOTO = {".png", ".gif", ".jpg", ".jpeg", ".webp", ".bmp"}
+    LADO_FOTO = 400
+
+    def importar_foto(self, origen: str, nombre: str = "") -> str:
+        """Copia la foto elegida a data/fotos (como PNG) y devuelve su ruta relativa.
+
+        Así la foto viaja con el proyecto y se ve en cualquier computador.
+        Las fotos JPG necesitan la librería Pillow; PNG y GIF se copian tal cual.
+        """
+        ruta = Path(self._exigir(origen, "una imagen"))
+        if not ruta.is_file():
+            raise ReglaNegocioError("No se encontró la imagen elegida")
+        extension = ruta.suffix.lower()
+        if extension not in self.FORMATOS_FOTO:
+            raise ReglaNegocioError("La foto debe ser JPG, PNG, GIF, WEBP o BMP")
+        carpeta = self._directorio / "fotos"
+        try:
+            if ruta.resolve().parent == carpeta.resolve() and extension in {".png", ".gif"}:
+                return self.foto_relativa(str(ruta))
+            carpeta.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise PersistenciaError(f"No se pudo preparar la carpeta de fotos: {error}") from error
+        base = self._nombre_archivo(nombre or ruta.stem)
+        try:
+            from PIL import Image, ImageOps
+        except ImportError:
+            if extension not in {".png", ".gif"}:
+                raise ReglaNegocioError(
+                    "Para usar fotos JPG instala Pillow: python -m pip install pillow "
+                    "(el archivo 'Abrir Smart Clothes.bat' lo instala solo)."
+                ) from None
+            destino = self._destino_libre(carpeta, base, extension)
+            try:
+                shutil.copyfile(ruta, destino)
+            except OSError as error:
+                raise PersistenciaError(f"No se pudo copiar la foto: {error}") from error
+            return destino.relative_to(self._directorio).as_posix()
+        destino = self._destino_libre(carpeta, base, ".png")
+        try:
+            with Image.open(ruta) as imagen:
+                imagen = ImageOps.exif_transpose(imagen)  # respeta la orientación de las fotos del celular
+                imagen.thumbnail((self.LADO_FOTO, self.LADO_FOTO))
+                if imagen.mode not in ("RGB", "RGBA"):
+                    imagen = imagen.convert("RGBA")
+                imagen.save(destino, "PNG", optimize=True)
+        except OSError as error:
+            raise ReglaNegocioError(f"No se pudo leer la imagen: {error}") from error
+        return destino.relative_to(self._directorio).as_posix()
+
+    @staticmethod
+    def _nombre_archivo(texto: str) -> str:
+        """'Polera Básica Ñandú' -> 'polera-basica-nandu'"""
+        sin_tildes = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+        limpio = re.sub(r"[^a-z0-9]+", "-", sin_tildes.lower()).strip("-")
+        return limpio or "foto"
+
+    @staticmethod
+    def _destino_libre(carpeta: Path, base: str, extension: str) -> Path:
+        destino = carpeta / f"{base}{extension}"
+        numero = 2
+        while destino.exists():
+            destino = carpeta / f"{base}-{numero}{extension}"
+            numero += 1
+        return destino
 
     def exportar_comprobante(self, folio: str, destino: str) -> Path:
         texto = self.emitir_comprobante(folio)

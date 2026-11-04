@@ -101,7 +101,7 @@ class Productos(Pantalla):
         self.lbl_previa.pack(expand=True)
         datos_foto = tk.Frame(foto, bg=COLORES["tarjeta"])
         datos_foto.pack(side="left", fill="x", expand=True, padx=(12, 0))
-        etiqueta_campo(datos_foto, "Foto (PNG o GIF)").pack(anchor="w")
+        etiqueta_campo(datos_foto, "Foto de la prenda").pack(anchor="w")
         self.foto = tk.StringVar()
         ttk.Entry(datos_foto, textvariable=self.foto).pack(fill="x", pady=(2, 6))
         ttk.Button(datos_foto, text="Elegir imagen…", command=self.elegir_foto).pack(anchor="w")
@@ -221,11 +221,17 @@ class Productos(Pantalla):
         ruta = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),
             title="Foto de la prenda",
-            initialdir=str(self.controlador.directorio / "fotos"),
-            filetypes=(("Imágenes", "*.png *.gif"), ("Todos los archivos", "*.*")),
+            filetypes=(("Imágenes", "*.jpg *.jpeg *.png *.gif *.webp *.bmp"), ("Todos los archivos", "*.*")),
         )
-        if ruta:
-            self.foto.set(self.controlador.foto_relativa(ruta))
+        if not ruta:
+            return
+        nombre = self.sku.get().strip() or self.nombre.get().strip()
+        ok, relativa = self.ejecutar(lambda: self.controlador.importar_foto(ruta, nombre))
+        if not ok:
+            return
+        self.foto.set(relativa)
+        if self._sku:
+            informar(self.winfo_toplevel(), "Foto lista", "Toca «Guardar cambios» para dejarla en la ficha.")
 
     def refrescar(self) -> None:
         self._llenar_tabla()
