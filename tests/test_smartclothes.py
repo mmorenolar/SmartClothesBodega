@@ -376,6 +376,21 @@ class ControladorTests(unittest.TestCase):
         with self.assertRaises(ReglaNegocioError):
             self.controlador.registrar_merma("POL-1", "1", "Robo", "Motivo que no existe")
 
+    def test_documento_imprimible_con_fotos(self):
+        self.controlador.registrar_tienda("T-1", "Tienda Uno", "Calle 1")
+        origen = sorted((Path(__file__).resolve().parents[1] / "data" / "fotos").glob("*.png"))[0]
+        foto = self.controlador.importar_foto(str(origen), "polera")
+        self.controlador.registrar_producto("Polera", "POL-1", "Polera", foto, "10", "M", "Rojo", "Dama", "")
+        orden = self.controlador.crear_orden("T-1", date.today().strftime("%d-%m-%Y"))
+        self.controlador.agregar_a_orden(orden.folio, "POL-1", "3")
+        with self.assertRaises(ReglaNegocioError):
+            self.controlador.guardar_documento(orden.folio)
+        self.controlador.confirmar_orden(orden.folio, "Camión 3/4 (liviano)")
+        ruta = self.controlador.guardar_documento(orden.folio, Path(self._temporal.name) / "ot.html", imprimir=True)
+        html = ruta.read_text(encoding="utf-8")
+        for dato in (orden.folio, "Tienda Uno", "Calle 1", "POL-1", "data:image/png;base64", "window.print()"):
+            self.assertIn(dato, html)
+
     def test_exporta_comprobante(self):
         self.controlador.registrar_producto("Calzado", "CAL-1", "Bota", "b.png", "4", "40", "Café", "Hombre", "Casual")
         merma = self.controlador.registrar_merma("CAL-1", "1", "Daño", "Caja aplastada y suela rota")
@@ -518,9 +533,10 @@ class InterfazTests(unittest.TestCase):
         producto = controlador.obtener_producto("PAN-SLIM-AZ-40")
         self.assertEqual((producto.stock, producto.estado), (0, EstadoProducto.AGOTADO))
         self.assertIs(self.app._actual, self.app._pantallas["comprobantes"])
-        texto = self.app._pantallas["comprobantes"].texto.get("1.0", "end")
+        texto = self.app._pantallas["comprobantes"].hoja.texto_visible()
         self.assertIn(folio, texto)
         self.assertIn("Camión 3/4", texto)
+        self.assertIn("Recibido por (tienda)", texto)
 
         self.app.mostrar("productos")
         productos.tabla.selection_set("PAN-SLIM-AZ-40")

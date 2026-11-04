@@ -138,6 +138,8 @@ def aplicar(raiz: tk.Tk) -> None:
                      font=fuente(9, "bold"), padding=(6, 8), borderwidth=0)
     estilo.map("Treeview.Heading", background=[("active", c["zebra"])])
     estilo.configure("Fotos.Treeview", rowheight=56)
+    estilo.configure("Mini.Treeview", rowheight=40)
+    estilo.layout("Mini.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
     estilo.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
     estilo.layout("Fotos.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 

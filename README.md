@@ -39,7 +39,7 @@ Menú lateral con seis módulos (también con **Ctrl + 1 … 6**):
 - **Tiendas:** tabla y ficha para crear o editar.
 - **Órdenes de traslado:** tres pasos (prendas → transporte → confirmar). Cada camión se muestra como tarjeta con costo y ocupación, y se sugiere el más conveniente.
 - **Mermas y pérdidas:** formulario guiado con ficha de la prenda, motivo en botones y contador de caracteres.
-- **Comprobantes:** listado filtrable y vista del documento; al confirmar un traslado, un camión cruza la pantalla.
+- **Comprobantes:** listado filtrable y hoja con diseño de documento (logo, folio, datos de la tienda, tabla con fotos, total y firmas). El botón **Imprimir** abre la hoja con el cuadro de impresión, donde también se puede guardar como PDF. Al confirmar un traslado, un camión cruza la pantalla.
 
 **Fotos:** en la ficha de la prenda, *Elegir imagen…* acepta JPG, PNG, GIF, WEBP o BMP. La foto se achica y se copia como PNG a `data/fotos`, así viaja con el proyecto. Para JPG se usa la librería Pillow, que `Abrir Smart Clothes.bat` instala sola la primera vez.
 

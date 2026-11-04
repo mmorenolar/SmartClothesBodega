@@ -1,6 +1,7 @@
-"""Comprobantes: listado de documentos y vista tipo "hoja" con animación del camión."""
+"""Comprobantes: listado de documentos y hoja con diseño de documento real, lista para imprimir."""
 
 import tkinter as tk
+import webbrowser
 from tkinter import filedialog, ttk
 
 from smartclothes.vista import tema
@@ -72,10 +73,173 @@ class CamionAnimado(tk.Canvas):
         paso(1)
 
 
+class Desplazable(tk.Frame):
+    """Marco con barra de desplazamiento vertical para contenido largo."""
+
+    def __init__(self, master, fondo: str):
+        super().__init__(master, bg=fondo)
+        self._lienzo = tk.Canvas(self, bg=fondo, highlightthickness=0)
+        barra = ttk.Scrollbar(self, orient="vertical", command=self._lienzo.yview)
+        self._lienzo.configure(yscrollcommand=barra.set)
+        self._lienzo.grid(row=0, column=0, sticky="nsew")
+        barra.grid(row=0, column=1, sticky="ns")
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.interior = tk.Frame(self._lienzo, bg=fondo)
+        ventana = self._lienzo.create_window((0, 0), window=self.interior, anchor="nw")
+        self.interior.bind("<Configure>", lambda _e: self._lienzo.configure(scrollregion=self._lienzo.bbox("all")))
+        self._lienzo.bind("<Configure>", lambda e: self._lienzo.itemconfigure(ventana, width=e.width))
+        self._lienzo.bind("<Enter>", lambda _e: self._rueda(True))
+        self._lienzo.bind("<Leave>", lambda _e: self._rueda(False))
+
+    def _rueda(self, activa: bool) -> None:
+        if activa:
+            self._lienzo.bind_all("<MouseWheel>", lambda e: self._lienzo.yview_scroll(-e.delta // 120, "units"))
+            self._lienzo.bind_all("<Button-4>", lambda _e: self._lienzo.yview_scroll(-1, "units"))
+            self._lienzo.bind_all("<Button-5>", lambda _e: self._lienzo.yview_scroll(1, "units"))
+        else:
+            for evento in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                self._lienzo.unbind_all(evento)
+
+    def al_inicio(self) -> None:
+        self._lienzo.yview_moveto(0)
+
+
+class HojaDocumento(tk.Frame):
+    """Dibuja el comprobante como un documento: encabezado, datos, tabla con fotos, total y firmas."""
+
+    def __init__(self, master, controlador):
+        super().__init__(master, bg="#ffffff", padx=28, pady=22)
+        self._controlador = controlador
+        self._imagenes: list = []
+
+    def limpiar(self) -> None:
+        for hijo in self.winfo_children():
+            hijo.destroy()
+        self._imagenes.clear()
+
+    def texto_visible(self) -> str:
+        """Todo el texto de la hoja (útil para pruebas)."""
+        textos = []
+
+        def recorrer(widget):
+            for hijo in widget.winfo_children():
+                if isinstance(hijo, tk.Label) and hijo.cget("text"):
+                    textos.append(str(hijo.cget("text")))
+                recorrer(hijo)
+
+        recorrer(self)
+        return "\n".join(textos)
+
+    def _etiqueta(self, padre, texto, tamano=10, peso="normal", color="texto", fondo="#ffffff", **opciones):
+        return tk.Label(padre, text=texto, bg=fondo, fg=COLORES.get(color, color), font=tema.fuente(tamano, peso),
+                        **opciones)
+
+    def mostrar(self, datos: dict) -> None:
+        self.limpiar()
+        self._encabezado(datos)
+        if datos["tipo"] == "traslado":
+            self._datos([("Tienda destino", datos["tienda"]), ("Dirección de entrega", datos["direccion"]),
+                         ("Fecha de despacho", datos["fecha"]),
+                         ("Transporte", f"{datos['transporte']} · ocupado al {datos['ocupacion']}%")])
+            self._tabla(datos["lineas"], "Cantidad")
+            self._total(datos)
+            self._firmas(("Despachado por (bodega)", "Transportista", "Recibido por (tienda)"))
+        else:
+            self._datos([("Fecha de registro", datos["fecha"]), ("Motivo", datos["motivo"])])
+            linea = {clave: datos[clave] for clave in ("sku", "nombre", "talla", "color", "foto")}
+            linea["cantidad"] = datos["unidades"]
+            self._tabla([linea], "Dada de baja")
+            caja = tk.Frame(self, bg=COLORES["aviso_suave"], padx=12, pady=8)
+            caja.pack(fill="x", pady=(14, 0))
+            tk.Frame(caja, bg=COLORES["aviso"], width=4).pack(side="left", fill="y", padx=(0, 10))
+            self._etiqueta(caja, f"Observación: {datos['observacion']}", fondo=COLORES["aviso_suave"],
+                           wraplength=520, justify="left").pack(side="left", anchor="w")
+            self._firmas(("Responsable de bodega", "Supervisor"))
+        self._etiqueta(self, f"Documento emitido por el sistema Smart Clothes · {datos['folio']}", 8,
+                       color="#9aa1ac").pack(pady=(18, 0))
+
+    def _encabezado(self, datos: dict) -> None:
+        cabeza = tk.Frame(self, bg="#ffffff")
+        cabeza.pack(fill="x")
+        marca = tk.Frame(cabeza, bg="#ffffff")
+        marca.pack(side="left")
+        tk.Label(marca, text="SC", bg=COLORES["acento"], fg="#ffffff", width=3, pady=8,
+                 font=tema.fuente(13, "bold")).pack(side="left")
+        nombres = tk.Frame(marca, bg="#ffffff")
+        nombres.pack(side="left", padx=10)
+        self._etiqueta(nombres, "Smart Clothes", 14, "bold").pack(anchor="w")
+        self._etiqueta(nombres, "Bodega principal · Inventario y traslados", 9, color="suave").pack(anchor="w")
+        folio = tk.Frame(cabeza, bg="#ffffff", highlightthickness=2, highlightbackground=COLORES["acento"],
+                         padx=16, pady=6)
+        folio.pack(side="right")
+        self._etiqueta(folio, datos["titulo"].upper(), 8, "bold", "acento").pack()
+        self._etiqueta(folio, datos["folio"], 16, "bold").pack()
+        tk.Frame(self, bg=COLORES["acento"], height=3).pack(fill="x", pady=(12, 14))
+
+    def _datos(self, pares) -> None:
+        rejilla = tk.Frame(self, bg="#ffffff")
+        rejilla.pack(fill="x")
+        for indice, (etiqueta, valor) in enumerate(pares):
+            caja = tk.Frame(rejilla, bg=COLORES["zebra"], padx=10, pady=7)
+            caja.grid(row=indice // 2, column=indice % 2, sticky="nsew", padx=(0 if indice % 2 == 0 else 10, 0),
+                      pady=(0, 8))
+            self._etiqueta(caja, etiqueta.upper(), 7, "bold", "suave", COLORES["zebra"]).pack(anchor="w")
+            self._etiqueta(caja, valor, 10, fondo=COLORES["zebra"]).pack(anchor="w")
+        rejilla.columnconfigure(0, weight=1, uniform="datos")
+        rejilla.columnconfigure(1, weight=1, uniform="datos")
+
+    def _tabla(self, lineas: list[dict], titulo_cantidad: str) -> None:
+        tabla = tk.Frame(self, bg="#ffffff")
+        tabla.pack(fill="x", pady=(6, 0))
+        columnas = ("Foto", "SKU", "Prenda", "Talla", "Color", titulo_cantidad)
+        for columna, titulo in enumerate(columnas):
+            self._etiqueta(tabla, titulo.upper(), 7, "bold", "suave").grid(
+                row=0, column=columna, sticky="e" if columna == 5 else "w", padx=6, pady=(0, 4))
+        tk.Frame(tabla, bg=COLORES["borde"], height=2).grid(row=1, column=0, columnspan=6, sticky="ew")
+        for numero, linea in enumerate(lineas):
+            fila_grid = 2 + numero * 2
+            imagen = cargar_miniatura(linea["foto"], 44)
+            if imagen:
+                self._imagenes.append(imagen)
+            foto = tk.Label(tabla, bg=COLORES["zebra"], width=44 if imagen else 6, height=44 if imagen else 2,
+                            image=imagen or "", text="" if imagen else "—")
+            foto.grid(row=fila_grid, column=0, padx=6, pady=5, sticky="w")
+            valores = (linea["sku"], linea["nombre"], linea["talla"], linea["color"], str(linea["cantidad"]))
+            for columna, valor in enumerate(valores, start=1):
+                ultima = columna == 5
+                self._etiqueta(tabla, valor, 10, "bold" if ultima else "normal",
+                               "suave" if columna == 1 else "texto").grid(
+                    row=fila_grid, column=columna, sticky="e" if ultima else "w", padx=6)
+            tk.Frame(tabla, bg="#eef0f3", height=1).grid(row=fila_grid + 1, column=0, columnspan=6, sticky="ew")
+        tabla.columnconfigure(2, weight=1)
+        tabla.columnconfigure(5, weight=1)
+
+    def _total(self, datos: dict) -> None:
+        total = tk.Frame(self, bg="#ffffff")
+        total.pack(fill="x", pady=(10, 0))
+        caja = tk.Frame(total, bg=COLORES["acento"], padx=14, pady=6)
+        caja.pack(side="right")
+        self._etiqueta(caja, "Total de unidades enviadas", 10, color="#ffffff", fondo=COLORES["acento"]).pack(
+            side="left")
+        self._etiqueta(caja, str(datos["unidades"]), 14, "bold", "#ffffff", COLORES["acento"]).pack(
+            side="left", padx=(10, 0))
+        self._etiqueta(total, f"Costo de despacho  {datos['costo']}", 10, color="suave").pack(side="right", padx=14)
+
+    def _firmas(self, nombres: tuple[str, ...]) -> None:
+        firmas = tk.Frame(self, bg="#ffffff")
+        firmas.pack(fill="x", pady=(46, 0))
+        for columna, nombre in enumerate(nombres):
+            caja = tk.Frame(firmas, bg="#ffffff")
+            caja.grid(row=0, column=columna, sticky="ew", padx=12)
+            tk.Frame(caja, bg=COLORES["texto"], height=1).pack(fill="x")
+            self._etiqueta(caja, nombre, 9, color="suave").pack(pady=(4, 0))
+            firmas.columnconfigure(columna, weight=1, uniform="firmas")
+
+
 class Comprobantes(Pantalla):
     def __init__(self, master, controlador):
         super().__init__(master, controlador)
-        self._miniaturas: list[tk.PhotoImage] = []
         self._pendiente: str | None = None
         self._animar = False
         self._folio: str | None = None
@@ -86,7 +250,7 @@ class Comprobantes(Pantalla):
         cuerpo.columnconfigure(1, weight=1)
         cuerpo.rowconfigure(0, weight=1)
 
-        lista = Tarjeta(cuerpo, width=320, padding=14)
+        lista = Tarjeta(cuerpo, width=300, padding=14)
         lista.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
         lista.pack_propagate(False)
         self.filtro = tk.StringVar(value="Todos")
@@ -96,39 +260,28 @@ class Comprobantes(Pantalla):
             ttk.Radiobutton(segmentos, text=texto, value=texto, variable=self.filtro, style="Segmento.Toolbutton",
                             command=self.refrescar).pack(side="left", fill="x", expand=True, padx=(0, 4))
         marco, self.lista = crear_tabla(lista, ("folio", "tipo", "fecha"), ("Folio", "Tipo", "Fecha"),
-                                        (95, 90, 90), altura=12)
+                                        (90, 80, 90), altura=12)
         marco.pack(fill="both", expand=True)
         self.lista.bind("<<TreeviewSelect>>", lambda _e: self._al_elegir())
 
-        self.hoja = Tarjeta(cuerpo, padding=0)
-        self.hoja.grid(row=0, column=1, sticky="nsew")
-        barra = tk.Frame(self.hoja, bg=COLORES["tarjeta"], padx=18, pady=12)
+        panel = Tarjeta(cuerpo, padding=0)
+        panel.grid(row=0, column=1, sticky="nsew")
+        barra = tk.Frame(panel, bg=COLORES["tarjeta"], padx=18, pady=12)
         barra.pack(fill="x")
-        self.boton_exportar = ttk.Button(barra, text="Guardar .txt", command=self.exportar)
-        self.boton_exportar.pack(side="right")
-        self.boton_copiar = ttk.Button(barra, text="Copiar", command=self.copiar)
-        self.boton_copiar.pack(side="right", padx=6)
+        self.boton_imprimir = ttk.Button(barra, text="Imprimir", style="Primario.TButton", command=self.imprimir)
+        self.boton_imprimir.pack(side="right")
+        self.boton_guardar = ttk.Button(barra, text="Guardar copia", command=self.guardar_copia)
+        self.boton_guardar.pack(side="right", padx=6)
         self.lbl_documento = ttk.Label(barra, text="Comprobante", style="Seccion.TLabel")
         self.lbl_documento.pack(side="left")
 
-        self.camion = CamionAnimado(self.hoja)
-
-        self.marco_fotos = tk.Frame(self.hoja, bg=COLORES["tarjeta"], padx=18)
-        marco_tabla, self.tabla = crear_tabla(
-            self.marco_fotos,
-            ("sku", "nombre", "talla", "color", "cantidad"),
-            ("SKU", "Prenda", "Talla", "Color", "Cantidad"),
-            (125, 170, 55, 85, 75),
-            altura=3,
-            con_imagen=True,
-        )
-        marco_tabla.pack(fill="x", pady=(10, 0))
-
-        self.texto = tk.Text(self.hoja, wrap="none", relief="flat", bg=COLORES["tarjeta"], fg=COLORES["texto"],
-                             font=tema.mono(10), padx=22, pady=14, highlightthickness=0, height=14)
-        self.texto.tag_configure("titulo", font=tema.mono(11, "bold"), foreground=COLORES["acento"])
-        self.texto.tag_configure("linea", foreground="#b9c0cb")
-        self.texto.configure(state="disabled")
+        self.camion = CamionAnimado(panel)
+        self.zona = Desplazable(panel, COLORES["fondo"])
+        self.zona.pack(fill="both", expand=True)
+        self.hoja = HojaDocumento(self.zona.interior, controlador)
+        self.hoja.pack(fill="x", padx=18, pady=16)
+        self.vacio = tk.Label(self.zona.interior, bg=COLORES["fondo"], fg=COLORES["suave"], font=tema.fuente(11),
+                              text="Aún no hay comprobantes.\nConfirma una orden de traslado o registra una merma.")
 
     def seleccionar(self, folio: str, animar: bool = False) -> None:
         """Traslados o mermas piden abrir un folio recién emitido."""
@@ -168,73 +321,51 @@ class Comprobantes(Pantalla):
     def mostrar(self, folio: str | None = None, animar: bool = False) -> None:
         self._folio = folio
         self.camion.pack_forget()
-        self.marco_fotos.pack_forget()
-        self.texto.pack_forget()
-        self.tabla.delete(*self.tabla.get_children())
-        self._miniaturas.clear()
         if not folio:
-            contenido = "Aún no hay comprobantes.\nConfirma una orden de traslado o registra una merma."
             self.lbl_documento.configure(text="Comprobante")
-            for boton in (self.boton_exportar, self.boton_copiar):
+            for boton in (self.boton_imprimir, self.boton_guardar):
                 boton.state(["disabled"])
-        else:
-            documento = self.controlador.obtener_documento(folio)
-            contenido = self.controlador.emitir_comprobante(folio)
-            tipo = "Orden de traslado" if documento.tipo == "traslado" else "Registro de merma"
-            self.lbl_documento.configure(text=f"{tipo} · {folio}")
-            for boton in (self.boton_exportar, self.boton_copiar):
-                boton.state(["!disabled"])
-            if documento.tipo == "traslado":
-                self.camion.pack(fill="x")
-                destino = self.controlador.nombre_tienda(documento.tienda_codigo).split(" — ")[-1]
-                transporte = documento.despacho.nombre if documento.despacho else ""
-                self.camion.mostrar(f"✓  Despachado a {destino} en {transporte}", animar)
-                self._mostrar_fotos(documento)
-        self.texto.pack(fill="both", expand=True)
-        self._escribir(contenido)
+            self.hoja.limpiar()
+            self.hoja.pack_forget()
+            self.vacio.pack(pady=80)
+            return
+        self.vacio.pack_forget()
+        self.hoja.pack(fill="x", padx=18, pady=16)
+        datos = self.controlador.datos_documento(folio)
+        self.lbl_documento.configure(text=f"{datos['titulo']} · {folio}")
+        for boton in (self.boton_imprimir, self.boton_guardar):
+            boton.state(["!disabled"])
+        if datos["tipo"] == "traslado":
+            self.camion.pack(fill="x", before=self.zona)
+            destino = datos["tienda"].split(" — ")[-1]
+            self.camion.mostrar(f"✓  Despachado a {destino} en {datos['transporte']}", animar)
+        self.hoja.mostrar(datos)
+        self.zona.al_inicio()
 
-    def _escribir(self, contenido: str) -> None:
-        self.texto.configure(state="normal")
-        self.texto.delete("1.0", "end")
-        self.texto.insert("1.0", contenido)
-        for numero, linea in enumerate(contenido.splitlines(), start=1):
-            if linea and set(linea) <= {"=", "-"}:
-                self.texto.tag_add("linea", f"{numero}.0", f"{numero}.end")
-            elif numero in (2, 3):
-                self.texto.tag_add("titulo", f"{numero}.0", f"{numero}.end")
-        self.texto.configure(state="disabled")
-
-    def _mostrar_fotos(self, orden) -> None:
-        self.marco_fotos.pack(fill="x")
-        for indice, detalle in enumerate(orden.detalles):
-            imagen = cargar_miniatura(self.controlador.ruta_foto(detalle.foto), 48)
-            opciones = {"image": imagen} if imagen else {"text": "—"}
-            if imagen:
-                self._miniaturas.append(imagen)
-            fila(self.tabla, f"{indice}-{detalle.sku}",
-                 (detalle.sku, detalle.nombre, detalle.talla, detalle.color, detalle.cantidad), **opciones)
-        self.tabla.configure(height=min(max(len(orden.detalles), 1), 3))
-
-    def copiar(self) -> None:
+    def imprimir(self) -> None:
+        """Abre la hoja en el navegador con el cuadro de impresión (también permite guardar como PDF)."""
         if not self._folio:
             return
-        self.clipboard_clear()
-        self.clipboard_append(self.controlador.emitir_comprobante(self._folio))
-        informar(self.winfo_toplevel(), "Copiado", "El comprobante quedó en el portapapeles.")
+        ok, ruta = self.ejecutar(lambda: self.controlador.guardar_documento(self._folio, imprimir=True))
+        if not ok:
+            return
+        webbrowser.open(ruta.as_uri())
+        informar(self.winfo_toplevel(), "Listo para imprimir",
+                 "Se abrió el documento. Elige la impresora o «Guardar como PDF».")
 
-    def exportar(self) -> None:
+    def guardar_copia(self) -> None:
         folio = self._folio
         if not folio:
             return
         destino = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
             title="Guardar comprobante",
-            initialfile=f"{folio}.txt",
-            defaultextension=".txt",
-            filetypes=(("Texto", "*.txt"),),
+            initialfile=f"{folio}.html",
+            defaultextension=".html",
+            filetypes=(("Documento web", "*.html"),),
         )
         if not destino:
             return
-        ok, ruta = self.ejecutar(lambda: self.controlador.exportar_comprobante(folio, destino))
+        ok, ruta = self.ejecutar(lambda: self.controlador.guardar_documento(folio, destino))
         if ok:
             informar(self.winfo_toplevel(), "Comprobante guardado", f"Se guardó en {ruta}")

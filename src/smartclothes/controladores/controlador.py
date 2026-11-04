@@ -2,6 +2,7 @@
 
 import re
 import shutil
+import tempfile
 import unicodedata
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from smartclothes.modelo.sistema import SmartClothes
 from smartclothes.modelo.transporte import TRANSPORTES, transporte_por_nombre
 from smartclothes.modelo.validacion import fecha_desde_texto
 from smartclothes.persistencia.repositorio_json import RepositorioJSON
+from smartclothes.reportes.documento_html import documento_html
 from smartclothes.rutas import directorio_datos
 
 
@@ -234,6 +236,76 @@ class Controlador:
             destino = carpeta / f"{base}-{numero}{extension}"
             numero += 1
         return destino
+
+    def datos_documento(self, folio: str) -> dict:
+        """Todo lo que necesita la hoja del comprobante, en un formato simple."""
+        documento = self._sistema.obtener_documento(self._exigir(folio, "un documento"))
+        if not documento.aplicada:
+            raise ReglaNegocioError("El comprobante se emite cuando el documento está confirmado")
+        if documento.tipo == "traslado":
+            try:
+                tienda = self._sistema.obtener_tienda(documento.tienda_codigo)
+                nombre_tienda, direccion = tienda.identificacion, tienda.direccion
+            except ReglaNegocioError:
+                nombre_tienda, direccion = documento.tienda_codigo, "—"
+            despacho = documento.despacho
+            return {
+                "tipo": "traslado",
+                "titulo": "Orden de traslado",
+                "folio": documento.folio,
+                "fecha": documento.fecha_texto,
+                "tienda": nombre_tienda,
+                "direccion": direccion,
+                "transporte": despacho.nombre if despacho else "—",
+                "ocupacion": despacho.ocupacion if despacho else 0,
+                "costo": pesos(despacho.costo) if despacho else "—",
+                "unidades": documento.unidades,
+                "lineas": [
+                    {
+                        "sku": linea.sku,
+                        "nombre": linea.nombre,
+                        "talla": linea.talla,
+                        "color": linea.color,
+                        "cantidad": linea.cantidad,
+                        "foto": self.ruta_foto(linea.foto),
+                    }
+                    for linea in documento.detalles
+                ],
+            }
+        try:
+            foto = self.ruta_foto(self._sistema.obtener_producto(documento.sku).foto)
+        except ReglaNegocioError:
+            foto = None
+        return {
+            "tipo": "merma",
+            "titulo": "Registro de merma",
+            "folio": documento.folio,
+            "fecha": documento.fecha_texto,
+            "motivo": documento.motivo.etiqueta,
+            "observacion": documento.observacion,
+            "sku": documento.sku,
+            "nombre": documento.nombre,
+            "talla": documento.talla,
+            "color": documento.color,
+            "unidades": documento.cantidad,
+            "foto": foto,
+        }
+
+    def guardar_documento(self, folio: str, destino: str | Path | None = None, imprimir: bool = False) -> Path:
+        """Escribe la hoja HTML del comprobante. Sin destino, usa una carpeta temporal."""
+        html = documento_html(self.datos_documento(folio), imprimir=imprimir)
+        if destino is None:
+            carpeta = Path(tempfile.gettempdir()) / "smartclothes"
+            ruta = carpeta / f"{folio}{'-imprimir' if imprimir else ''}.html"
+        else:
+            ruta = Path(destino)
+            carpeta = ruta.parent
+        try:
+            carpeta.mkdir(parents=True, exist_ok=True)
+            ruta.write_text(html, encoding="utf-8")
+        except OSError as error:
+            raise PersistenciaError(f"No se pudo guardar el documento: {error}") from error
+        return ruta
 
     def exportar_comprobante(self, folio: str, destino: str) -> Path:
         texto = self.emitir_comprobante(folio)

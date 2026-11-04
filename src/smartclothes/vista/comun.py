@@ -241,9 +241,12 @@ def crear_tabla(
     encabezados: tuple[str, ...],
     anchos: tuple[int, ...],
     altura: int = 8,
-    con_imagen: bool = False,
+    con_imagen: bool | str = False,
 ) -> tuple[tk.Frame, ttk.Treeview]:
-    """Tabla con scroll y filas alternadas. Con con_imagen=True la primera columna muestra la foto."""
+    """Tabla con scroll y filas alternadas.
+
+    con_imagen=True agrega una columna con la foto; con_imagen="mini" la muestra más pequeña.
+    """
     marco = tk.Frame(parent, bg=COLORES["tarjeta"])
     tabla = ttk.Treeview(
         marco,
@@ -251,11 +254,11 @@ def crear_tabla(
         show="tree headings" if con_imagen else "headings",
         height=altura,
         selectmode="browse",
-        style="Fotos.Treeview" if con_imagen else "Treeview",
+        style={True: "Fotos.Treeview", "mini": "Mini.Treeview"}.get(con_imagen, "Treeview"),
     )
     if con_imagen:
         tabla.heading("#0", text="")
-        tabla.column("#0", width=56, stretch=False, anchor="center")
+        tabla.column("#0", width=48 if con_imagen == "mini" else 56, stretch=False, anchor="center")
     scroll = ttk.Scrollbar(marco, orient="vertical", command=tabla.yview)
     tabla.configure(yscrollcommand=scroll.set)
     for columna, encabezado_col, ancho in zip(columnas, encabezados, anchos):

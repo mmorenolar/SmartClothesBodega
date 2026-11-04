@@ -8,6 +8,7 @@ from smartclothes.modelo.errores import ReglaNegocioError
 from smartclothes.vista import tema
 from smartclothes.vista.comun import (
     COLORES,
+    cargar_miniatura,
     ComboBuscador,
     Pantalla,
     Tarjeta,
@@ -148,10 +149,10 @@ class Traslados(Pantalla):
         self.boton_anular = ttk.Button(cabeza, text="Anular orden", style="Peligro.TButton", command=self.anular)
         self.boton_anular.pack(side="right")
         self.lbl_destino = ttk.Label(self.detalle, style="Ayuda.TLabel")
-        self.lbl_destino.pack(anchor="w", pady=(2, 10))
+        self.lbl_destino.pack(anchor="w", pady=(2, 8))
 
         self.pasos = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
-        self.pasos.pack(fill="x", pady=(0, 12))
+        self.pasos.pack(fill="x", pady=(0, 8))
         self._etiquetas_paso = []
         for indice, texto in enumerate(("Prendas", "Transporte", "Confirmar"), start=1):
             numero = tk.Label(self.pasos, text=str(indice), width=2, font=tema.fuente(9, "bold"))
@@ -186,9 +187,12 @@ class Traslados(Pantalla):
             self.detalle,
             ("sku", "nombre", "talla", "color", "cantidad"),
             ("SKU", "Prenda", "Talla", "Color", "Cantidad"),
-            (130, 170, 55, 90, 75),
-            altura=4,
+            (125, 160, 55, 85, 75),
+            altura=3,
+            con_imagen="mini",
         )
+        self._fotos_lineas: list = []
+        self._foto_sku = None
         marco.pack(fill="both", expand=True, pady=(8, 0))
         pie_lineas = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
         pie_lineas.pack(fill="x")
@@ -199,14 +203,14 @@ class Traslados(Pantalla):
         self.lbl_unidades.pack(side="right", pady=(4, 0))
 
         # Paso 2: transporte
-        ttk.Label(self.detalle, text="Transporte", style="Seccion.TLabel").pack(anchor="w", pady=(12, 6))
+        ttk.Label(self.detalle, text="Transporte", style="Seccion.TLabel").pack(anchor="w", pady=(8, 4))
         self.transporte = tk.StringVar()
         self.zona_camiones = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
         self.zona_camiones.pack(fill="x")
 
         # Paso 3: confirmar
         pie = tk.Frame(self.detalle, bg=COLORES["tarjeta"])
-        pie.pack(fill="x", pady=(14, 0))
+        pie.pack(fill="x", pady=(10, 0))
         self.totales = ttk.Label(pie, style="Tarjeta.TLabel")
         self.totales.pack(side="left")
         self.boton_confirmar = ttk.Button(pie, text="Confirmar traslado  ›", style="Primario.TButton",
@@ -242,8 +246,11 @@ class Traslados(Pantalla):
 
     def _describir_sku(self) -> None:
         texto = self.sku.get().strip()
+        self._foto_sku = None
+        self.info_sku.configure(image="")
         if not texto:
-            self.info_sku.configure(text="Escribe o elige un SKU. Enter para agregar.", foreground=COLORES["suave"])
+            self.info_sku.configure(text="Escribe un SKU o el nombre de la prenda. Enter para agregar.",
+                                    foreground=COLORES["suave"])
             return
         try:
             producto = self.controlador.obtener_producto(texto)
@@ -258,8 +265,11 @@ class Traslados(Pantalla):
                 self.info_sku.configure(text="No hay prendas con ese SKU o nombre.", foreground=COLORES["peligro"])
             return
         disponible = self.controlador.stock_disponible(producto.sku)
+        self._foto_sku = cargar_miniatura(self.controlador.ruta_foto(producto.foto), 32)
         self.info_sku.configure(
-            text=f"{producto.descripcion()}  ·  Disponible para traslado: {disponible}",
+            image=self._foto_sku or "",
+            compound="left",
+            text=f"  {producto.descripcion()}  ·  Disponible para traslado: {disponible}",
             foreground=COLORES["peligro"] if disponible == 0 else COLORES["suave"],
         )
 
@@ -289,8 +299,14 @@ class Traslados(Pantalla):
         )
 
         self.lineas.delete(*self.lineas.get_children())
+        self._fotos_lineas.clear()
         for detalle in orden.detalles:
-            fila(self.lineas, detalle.sku, (detalle.sku, detalle.nombre, detalle.talla, detalle.color, detalle.cantidad))
+            foto = cargar_miniatura(self.controlador.ruta_foto(detalle.foto), 34)
+            opciones = {"image": foto} if foto else {"text": "—"}
+            if foto:
+                self._fotos_lineas.append(foto)
+            fila(self.lineas, detalle.sku, (detalle.sku, detalle.nombre, detalle.talla, detalle.color, detalle.cantidad),
+                 **opciones)
         lineas = len(orden.detalles)
         self.lbl_unidades.configure(text=f"{lineas} línea{'s' if lineas != 1 else ''} · {unidades(orden.unidades)}")
 

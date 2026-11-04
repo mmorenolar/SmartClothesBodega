@@ -405,6 +405,14 @@ class RegistroMerma(SalidaBodega):
         return self._nombre
 
     @property
+    def talla(self) -> str:
+        return self._talla
+
+    @property
+    def color(self) -> str:
+        return self._color
+
+    @property
     def cantidad(self) -> int:
         return self._cantidad
 
