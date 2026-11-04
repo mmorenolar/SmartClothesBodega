@@ -296,22 +296,107 @@ def configurar_combo(combo: ttk.Combobox, etiquetas: list[str], actual: str) -> 
 
 
 class ComboBuscador(ttk.Combobox):
-    """Lista desplegable que filtra sus opciones a medida que se escribe."""
+    """Buscador con sugerencias: mientras escribes aparece una lista con las coincidencias.
+
+    Busca por SKU o por nombre. Con las flechas ↑ ↓ te mueves, con Enter o clic eliges,
+    con Esc cierras. La flecha del costado sigue mostrando la lista completa.
+    """
+
+    MAXIMO_SUGERENCIAS = 7
 
     def __init__(self, master, **opciones):
         super().__init__(master, **opciones)
-        self._opciones: list[str] = []
-        self.bind("<KeyRelease>", self._filtrar, add="+")
+        self._opciones: list[tuple[str, str]] = []
+        self._coincidencias: list[str] = []
+        self.configure(postcommand=self._lista_completa)
+        self._popup = tk.Frame(self.winfo_toplevel(), bg=COLORES["borde"], bd=0, highlightthickness=0)
+        self._lista = tk.Listbox(self._popup, activestyle="none", relief="flat", borderwidth=0, highlightthickness=0,
+                                 bg=COLORES["tarjeta"], fg=COLORES["texto"], selectbackground=COLORES["acento"],
+                                 selectforeground="#ffffff", font=tema.fuente(10))
+        self._lista.pack(fill="both", expand=True, padx=1, pady=1, ipadx=6, ipady=4)
+        self._lista.bind("<ButtonRelease-1>", lambda _e: self._elegir_resaltada())
+        # Etiqueta propia al inicio: estos atajos se atienden antes que los de la pantalla.
+        etiqueta = f"Buscador{id(self)}"
+        self.bindtags((etiqueta, *self.bindtags()))
+        self.bind_class(etiqueta, "<KeyRelease>", self._al_escribir)
+        self.bind_class(etiqueta, "<Down>", lambda _e: self._mover(1))
+        self.bind_class(etiqueta, "<Up>", lambda _e: self._mover(-1))
+        self.bind_class(etiqueta, "<Return>", self._al_enter)
+        self.bind_class(etiqueta, "<Escape>", lambda _e: self._ocultar())
+        self.bind_class(etiqueta, "<FocusOut>", lambda _e: self.after(200, self._ocultar))
 
-    def opciones(self, valores: list[str]) -> None:
-        self._opciones = list(valores)
-        self["values"] = self._opciones
+    def opciones(self, valores) -> None:
+        """Recibe SKUs, o pares (SKU, texto que se muestra en la sugerencia)."""
+        self._opciones = [valor if isinstance(valor, tuple) else (valor, valor) for valor in valores]
+        self._lista_completa()
 
-    def _filtrar(self, evento=None) -> None:
-        if evento is not None and evento.keysym in {"Up", "Down", "Return", "Escape", "Tab"}:
+    def _lista_completa(self) -> None:
+        self._ocultar()
+        self["values"] = [valor for valor, _texto in self._opciones]
+
+    def _al_escribir(self, evento) -> None:
+        if evento.keysym in {"Up", "Down", "Return", "KP_Enter", "Escape", "Tab", "ISO_Left_Tab"}:
             return
         texto = self.get().strip().lower()
-        self["values"] = [valor for valor in self._opciones if texto in valor.lower()] or self._opciones
+        if not texto:
+            self._ocultar()
+            return
+        self._coincidencias = [
+            (valor, mostrado) for valor, mostrado in self._opciones if texto in mostrado.lower()
+        ][: self.MAXIMO_SUGERENCIAS]
+        exacta = len(self._coincidencias) == 1 and self._coincidencias[0][0].lower() == texto
+        if not self._coincidencias or exacta:
+            self._ocultar()
+            return
+        self._lista.delete(0, "end")
+        for _valor, mostrado in self._coincidencias:
+            self._lista.insert("end", mostrado)
+        self._lista.configure(height=len(self._coincidencias))
+        self._mostrar()
+
+    def _mostrar(self) -> None:
+        raiz = self.winfo_toplevel()
+        x = self.winfo_rootx() - raiz.winfo_rootx()
+        y = self.winfo_rooty() - raiz.winfo_rooty() + self.winfo_height() + 2
+        self._popup.place(x=x, y=y, width=max(self.winfo_width(), 470))
+        self._popup.lift()
+
+    def _ocultar(self) -> None:
+        try:
+            self._popup.place_forget()
+        except tk.TclError:
+            pass
+
+    def _visible(self) -> bool:
+        return bool(self._popup.winfo_ismapped())
+
+    def _mover(self, paso: int):
+        if not self._visible():
+            return None
+        actual = self._lista.curselection()
+        indice = (actual[0] + paso) if actual else (0 if paso > 0 else self._lista.size() - 1)
+        indice = max(0, min(indice, self._lista.size() - 1))
+        self._lista.selection_clear(0, "end")
+        self._lista.selection_set(indice)
+        self._lista.see(indice)
+        return "break"
+
+    def _al_enter(self, _evento):
+        if self._visible() and self._lista.curselection():
+            self._elegir_resaltada()
+            return "break"  # el Enter elige la sugerencia; el siguiente Enter agrega
+        self._ocultar()
+        return None
+
+    def _elegir_resaltada(self) -> None:
+        seleccion = self._lista.curselection()
+        indice = seleccion[0] if seleccion else 0
+        if indice < len(self._coincidencias):
+            self.set(self._coincidencias[indice][0])
+            self.icursor("end")
+        self._ocultar()
+        self.focus_set()
+        self.event_generate("<<ComboboxSelected>>")
 
 
 def cargar_miniatura(ruta: Path | None, lado: int):

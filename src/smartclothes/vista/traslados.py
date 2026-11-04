@@ -24,6 +24,10 @@ from smartclothes.vista.comun import (
     separador,
 )
 
+def unidades(cantidad: int) -> str:
+    return f"{cantidad} unidad" if cantidad == 1 else f"{cantidad} unidades"
+
+
 TIPO_ESTADO = {"Borrador": "aviso", "Confirmada": "exito", "Anulada": "neutro"}
 TAG_ESTADO = {"Borrador": ("aviso",), "Confirmada": ("exito",), "Anulada": ("suave",)}
 
@@ -216,7 +220,10 @@ class Traslados(Pantalla):
     def refrescar(self) -> None:
         self._tiendas = {tienda.identificacion: tienda.codigo for tienda in self.controlador.listar_tiendas()}
         configurar_combo(self.combo_tienda, list(self._tiendas), self.tienda.get())
-        self.combo_sku.opciones([producto.sku for producto in self.controlador.listar_productos()])
+        self.combo_sku.opciones([
+            (producto.sku, f"{producto.sku}   {producto.nombre} · {producto.linea} · T{producto.talla} · {producto.color}")
+            for producto in self.controlador.listar_productos()
+        ])
 
         seleccionado = self._folio
         self.tabla.delete(*self.tabla.get_children())
@@ -241,7 +248,14 @@ class Traslados(Pantalla):
         try:
             producto = self.controlador.obtener_producto(texto)
         except ReglaNegocioError:
-            self.info_sku.configure(text="SKU no encontrado.", foreground=COLORES["peligro"])
+            parecidos = len(self.controlador.buscar_productos(texto))
+            if parecidos:
+                self.info_sku.configure(
+                    text=f"{parecidos} prenda(s) coinciden: elige una de la lista o sigue escribiendo.",
+                    foreground=COLORES["suave"],
+                )
+            else:
+                self.info_sku.configure(text="No hay prendas con ese SKU o nombre.", foreground=COLORES["peligro"])
             return
         disponible = self.controlador.stock_disponible(producto.sku)
         self.info_sku.configure(
@@ -278,7 +292,7 @@ class Traslados(Pantalla):
         for detalle in orden.detalles:
             fila(self.lineas, detalle.sku, (detalle.sku, detalle.nombre, detalle.talla, detalle.color, detalle.cantidad))
         lineas = len(orden.detalles)
-        self.lbl_unidades.configure(text=f"{lineas} línea{'s' if lineas != 1 else ''} · {orden.unidades} unidades")
+        self.lbl_unidades.configure(text=f"{lineas} línea{'s' if lineas != 1 else ''} · {unidades(orden.unidades)}")
 
         editable = acciones["puede_editar_items"]
         for widget in (self.combo_sku, self.entrada_cantidad, self.boton_agregar, self.boton_quitar):
@@ -335,7 +349,7 @@ class Traslados(Pantalla):
         if confirmada:
             self.boton_confirmar.pack_forget()
             self.boton_comprobante.pack(side="right")
-            self.totales.configure(text=f"Despachada · {orden.unidades} unidades", foreground=COLORES["exito"])
+            self.totales.configure(text=f"Despachada · {unidades(orden.unidades)}", foreground=COLORES["exito"])
             return
         self.boton_comprobante.pack_forget()
         self.boton_confirmar.pack(side="right")
@@ -343,7 +357,7 @@ class Traslados(Pantalla):
         if orden.estado.etiqueta == "Anulada":
             self.totales.configure(text="Orden anulada: no sale nada de bodega.", foreground=COLORES["suave"])
         elif con_lineas:
-            self.totales.configure(text=f"{orden.unidades} unidades con {self.transporte.get() or '—'}",
+            self.totales.configure(text=f"{unidades(orden.unidades)} con {self.transporte.get() or '—'}",
                                    foreground=COLORES["texto"])
         else:
             self.totales.configure(text="Paso 1: agrega al menos una prenda.", foreground=COLORES["suave"])

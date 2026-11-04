@@ -457,6 +457,26 @@ class InterfazTests(unittest.TestCase):
         self.app.destroy()
         self._temporal.cleanup()
 
+    def test_buscador_sugiere_por_sku_o_nombre(self):
+        from smartclothes.vista.comun import ComboBuscador
+
+        combo = ComboBuscador(self.app)
+        opciones = [("CAL-DEP-BL-41", "CAL-DEP-BL-41 Zapatilla Runner"), ("CAL-FOR-NE-42", "CAL-FOR-NE-42 Zapato Oxford"),
+                    ("POL-BAS-NE-L", "POL-BAS-NE-L Polera Básica")]
+        combo.opciones(opciones)
+        tecla = type("Tecla", (), {"keysym": "a"})()
+        combo.set("zapato")
+        combo._al_escribir(tecla)
+        self.assertEqual([valor for valor, _ in combo._coincidencias], ["CAL-FOR-NE-42"])
+        combo.set("cal")
+        combo._al_escribir(tecla)
+        self.assertEqual(len(combo._coincidencias), 2)
+        combo._lista.selection_set(1)
+        combo._elegir_resaltada()
+        self.assertEqual(combo.get(), "CAL-FOR-NE-42")
+        combo._lista_completa()
+        self.assertEqual(len(combo["values"]), 3, "La flecha siempre muestra todas las prendas")
+
     def test_flujo_desde_las_pantallas(self):
         self.app._botones_nav["productos"].invoke()
         self.assertIs(self.app._actual, self.app._pantallas["productos"])

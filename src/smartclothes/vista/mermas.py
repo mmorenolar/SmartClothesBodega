@@ -107,7 +107,10 @@ class Mermas(Pantalla):
         self.lbl_observacion.pack(anchor="w", pady=(8, 0))
 
     def refrescar(self) -> None:
-        self.combo_sku.opciones([producto.sku for producto in self.controlador.listar_productos()])
+        self.combo_sku.opciones([
+            (producto.sku, f"{producto.sku}   {producto.nombre} · {producto.linea} · T{producto.talla} · {producto.color}")
+            for producto in self.controlador.listar_productos()
+        ])
         if not self.motivo.get():
             self.motivo.set(self.controlador.motivos_merma()[0])
         self.tabla.delete(*self.tabla.get_children())
@@ -134,7 +137,14 @@ class Mermas(Pantalla):
         try:
             producto = self.controlador.obtener_producto(texto)
         except ReglaNegocioError:
-            self.info_sku.configure(text="SKU no encontrado.", fg=COLORES["peligro"])
+            parecidos = len(self.controlador.buscar_productos(texto))
+            if parecidos:
+                self.info_sku.configure(
+                    text=f"{parecidos} prenda(s) coinciden: elige una de la lista o sigue escribiendo.",
+                    fg=COLORES["suave"],
+                )
+            else:
+                self.info_sku.configure(text="No hay prendas con ese SKU o nombre.", fg=COLORES["peligro"])
             return
         self._miniatura = cargar_miniatura(self.controlador.ruta_foto(producto.foto), 44)
         if self._miniatura:
