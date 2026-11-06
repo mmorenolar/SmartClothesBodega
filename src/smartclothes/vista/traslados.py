@@ -34,7 +34,7 @@ TAG_ESTADO = {"Borrador": ("aviso",), "Confirmada": ("exito",), "Anulada": ("sua
 
 
 class TarjetaCamion(tk.Frame):
-    """Opción de transporte que se elige con un clic. Muestra costo y ocupación."""
+    """Opción de transporte que se elige con un clic. Muestra cuánto del camión se ocupa."""
 
     def __init__(self, master, datos: dict, al_elegir):
         super().__init__(master, bg=COLORES["tarjeta"], highlightthickness=2,
@@ -57,13 +57,12 @@ class TarjetaCamion(tk.Frame):
         tk.Label(self, text=datos["descripcion"].split(": ", 1)[-1].capitalize(), bg=fondo, fg=COLORES["suave"],
                  font=tema.fuente(9)).pack(anchor="w", pady=(2, 6))
         if self.apto:
-            tk.Label(self, text=datos["costo"], bg=fondo, fg=COLORES["texto"], font=tema.fuente(16, "bold")).pack(
-                anchor="w"
-            )
+            tk.Label(self, text=f"{datos['ocupacion']}% ocupado", bg=fondo, fg=COLORES["texto"],
+                     font=tema.fuente(16, "bold")).pack(anchor="w")
             barra = ttk.Progressbar(self, style="Ocupacion.Horizontal.TProgressbar", maximum=100,
                                     value=max(datos["ocupacion"], 2))
             barra.pack(fill="x", pady=(6, 2))
-            tk.Label(self, text=f"Camión ocupado al {datos['ocupacion']}%", bg=fondo, fg=COLORES["suave"],
+            tk.Label(self, text=f"Capacidad: {datos['capacidad']} prendas", bg=fondo, fg=COLORES["suave"],
                      font=tema.fuente(9)).pack(anchor="w")
         else:
             tk.Label(self, text="No sirve para esta carga", bg=fondo, fg=COLORES["peligro"],

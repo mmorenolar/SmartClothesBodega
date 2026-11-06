@@ -6,7 +6,6 @@ import tempfile
 import unicodedata
 from pathlib import Path
 
-from smartclothes.modelo.formato import pesos
 from smartclothes.modelo.errores import PersistenciaError, ReglaNegocioError
 from smartclothes.modelo.producto import LINEAS, TIPOS_PRODUCTO, Producto
 from smartclothes.modelo.salida import MotivoMerma
@@ -57,7 +56,7 @@ class Controlador:
         return tuple(clase().nombre for clase in TRANSPORTES)
 
     def cotizar_despachos(self, folio: str) -> list[dict]:
-        """Lo que ofrece cada camión para la orden: costo y ocupación, o por qué no sirve."""
+        """Lo que ofrece cada camión para la orden: ocupación, o por qué no sirve."""
         sugerido = self.transporte_sugerido(folio)
         cotizaciones = []
         for transporte, plan, motivo in self._sistema.cotizar_despachos(folio):
@@ -65,7 +64,7 @@ class Controlador:
                 "nombre": transporte.nombre,
                 "descripcion": transporte.descripcion(),
                 "apto": plan is not None,
-                "costo": pesos(plan.costo) if plan else "",
+                "capacidad": transporte.capacidad,
                 "ocupacion": plan.ocupacion if plan else 0,
                 "motivo": motivo,
                 "sugerido": transporte.nombre == sugerido,
@@ -258,7 +257,6 @@ class Controlador:
                 "direccion": direccion,
                 "transporte": despacho.nombre if despacho else "—",
                 "ocupacion": despacho.ocupacion if despacho else 0,
-                "costo": pesos(despacho.costo) if despacho else "—",
                 "unidades": documento.unidades,
                 "lineas": [
                     {

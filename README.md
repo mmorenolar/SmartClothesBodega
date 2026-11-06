@@ -37,7 +37,7 @@ Menú lateral con seis módulos (también con **Ctrl + 1 … 6**):
 - **Inicio:** indicadores que suben contando, prendas agotadas o con stock bajo (clic para reponer) y últimos documentos.
 - **Productos:** buscador, filtros por tipo, línea o agotados, galería de tarjetas con foto, nombre, SKU y estado; al hacer clic en una prenda se abre su ficha para editarla o ingresar unidades.
 - **Tiendas:** tabla y ficha para crear o editar.
-- **Órdenes de traslado:** tres pasos (prendas → transporte → confirmar). Cada camión se muestra como tarjeta con costo y ocupación, y se sugiere el más conveniente.
+- **Órdenes de traslado:** tres pasos (prendas → transporte → confirmar). Cada camión se muestra como tarjeta con su ocupación, y se sugiere el más conveniente.
 - **Mermas y pérdidas:** formulario guiado con ficha de la prenda, motivo en botones y contador de caracteres.
 - **Comprobantes:** listado filtrable y hoja con diseño de documento (logo, folio, datos de la tienda, tabla con fotos, total y firmas). El botón **Imprimir** abre la hoja con el cuadro de impresión, donde también se puede guardar como PDF. Al confirmar un traslado, un camión cruza la pantalla.
 
@@ -65,8 +65,8 @@ Una orden se edita solo en Borrador. Confirmada es final: las prendas ya saliero
 5. No se agrega una cantidad mayor que el stock, contando lo ya reservado en otras órdenes en borrador. La prenda debe estar **Disponible**.
 6. Al confirmar se vuelve a validar todo y se descuenta el stock de inmediato. Si una línea falla, no se descuenta ninguna.
 7. Si el stock llega a cero, el estado cambia solo a **Agotado**. Un ingreso a bodega lo devuelve a **Disponible**.
-8. Al confirmar se elige el **transporte**. El **camión 3/4 (liviano)** lleva hasta 300 prendas: $35.000 de tarifa base más $120 por prenda. El **camión pesado** lleva de 200 a 3.000 prendas: $120.000 de tarifa base más $40 por prenda; no sale con menos de 200 porque no conviene moverlo casi vacío. La pantalla cotiza los dos y sugiere el más barato que sirve. Si el camión elegido no sirve para la carga, la orden no se confirma y no se descuenta nada.
-9. La confirmación emite un comprobante con folio único (`OT-000001`), fecha de despacho, tienda destino, cada prenda con SKU, foto, nombre, talla, color y cantidad, y el transporte con su ocupación y costo.
+8. Al confirmar se elige el **transporte**. Los camiones son propios de la bodega, así que no hay costo de despacho. El **camión 3/4 (liviano)** lleva hasta 300 prendas. El **camión pesado** lleva de 200 a 3.000 prendas; no sale con menos de 200 porque no conviene sacarlo casi vacío. La pantalla muestra cuánto se ocuparía cada uno y sugiere el más chico que alcanza. Si el camión elegido no sirve para la carga, la orden no se confirma y no se descuenta nada.
+9. La confirmación emite un comprobante con folio único (`OT-000001`), fecha de despacho, tienda destino, cada prenda con SKU, foto, nombre, talla, color y cantidad, y el transporte con su ocupación.
 10. Una merma pide SKU, cantidad, motivo (Daño, Pérdida, Falla de fábrica) y una observación de al menos 10 caracteres. Descuenta en el momento, puede agotar la prenda y emite un Registro de Merma con folio propio (`ME-000001`).
 11. El stock y el estado **no se editan a mano**: solo cambian con `Producto.descontar()` y `Producto.reponer()`. Editar la ficha no toca el stock.
 12. No se elimina una prenda con traslados o mermas, ni una tienda con órdenes.
@@ -79,7 +79,7 @@ Una orden se edita solo en Borrador. Confirmada es final: las prendas ya saliero
 | Abstracción | `Producto`, `SalidaBodega` y `Transporte` son clases abstractas (`abc`). No se instancian. |
 | Encapsulamiento | Stock y estado sin setters. Cambian solo con `descontar()` y `reponer()`; el estado se recalcula en el método privado `__actualizar_estado()`. |
 | Herencia | `Pantalon`, `Calzado`, `Polera` y `Chaqueta` especializan `Producto`. `OrdenTraslado` y `RegistroMerma` especializan `SalidaBodega`. `CamionLiviano` y `CamionPesado` especializan `Transporte`. |
-| Polimorfismo | `OrdenTraslado.cotizar` llama a `transporte.planificar()` sin saber qué camión recibió: cada uno responde con su capacidad, su carga mínima y su tarifa. `SmartClothes._aplicar_salida` recorre `lineas()` y `emitir_comprobante` llama a `comprobante()` sin saber si recibió un traslado o una merma. `detalle` y `tallas_validas()` cambian según la prenda. |
+| Polimorfismo | `OrdenTraslado.cotizar` llama a `transporte.planificar()` sin saber qué camión recibió: cada uno responde con su propia capacidad y carga mínima. `SmartClothes._aplicar_salida` recorre `lineas()` y `emitir_comprobante` llama a `comprobante()` sin saber si recibió un traslado o una merma. `detalle` y `tallas_validas()` cambian según la prenda. |
 | Composición | Una `OrdenTraslado` contiene varios `DetalleTraslado`. |
 
 ## Estructura

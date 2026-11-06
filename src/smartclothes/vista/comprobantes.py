@@ -224,7 +224,6 @@ class HojaDocumento(tk.Frame):
             side="left")
         self._etiqueta(caja, str(datos["unidades"]), 14, "bold", "#ffffff", COLORES["acento"]).pack(
             side="left", padx=(10, 0))
-        self._etiqueta(total, f"Costo de despacho  {datos['costo']}", 10, color="suave").pack(side="right", padx=14)
 
     def _firmas(self, nombres: tuple[str, ...]) -> None:
         firmas = tk.Frame(self, bg="#ffffff")

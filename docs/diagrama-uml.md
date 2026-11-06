@@ -101,24 +101,20 @@ classDiagram
         +nombre*
         +capacidad*
         +carga_minima
-        +costo(unidades)*
         +motivo_rechazo(unidades)
         +planificar(unidades) PlanDespacho
     }
     class CamionLiviano {
         capacidad = 300
-        costo = 35.000 + 120 x prenda
     }
     class CamionPesado {
         capacidad = 3000
         carga_minima = 200
-        costo = 120.000 + 40 x prenda
     }
     class PlanDespacho {
         transporte
         unidades
         capacidad
-        costo
         ocupacion
     }
     Transporte <|-- CamionLiviano
@@ -156,6 +152,6 @@ classDiagram
     Aplicacion --> Controlador
 ```
 
-`SmartClothes.confirmar_orden` recibe cualquier `Transporte` y la orden llama a `planificar()`. Cada camión responde con su propia capacidad, carga mínima y tarifa. Agregar un furgón, por ejemplo, es crear `class Furgon(Transporte)` y sumarlo a `TRANSPORTES`, sin modificar `OrdenTraslado` ni `SmartClothes`.
+`SmartClothes.confirmar_orden` recibe cualquier `Transporte` y la orden llama a `planificar()`. Cada camión responde con su propia capacidad y carga mínima. Agregar un furgón, por ejemplo, es crear `class Furgon(Transporte)` y sumarlo a `TRANSPORTES`, sin modificar `OrdenTraslado` ni `SmartClothes`.
 
 `SmartClothes._aplicar_salida` recibe cualquier `SalidaBodega`: recorre `lineas()`, valida y descuenta con `Producto.descontar()`, y luego llama a `marcar_aplicada()`. No tiene una rama para traslados y otra para mermas. Para sumar un nuevo tipo de salida (por ejemplo, una devolución a proveedor) basta con crear otra subclase.

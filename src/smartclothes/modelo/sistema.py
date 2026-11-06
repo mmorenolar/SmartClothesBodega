@@ -256,8 +256,8 @@ class SmartClothes:
         return cotizaciones
 
     def transporte_sugerido(self, folio: str) -> Transporte | None:
-        """El camión apto más barato para la carga de la orden."""
-        aptas = [(plan.costo, transporte) for transporte, plan, _motivo in self.cotizar_despachos(folio) if plan]
+        """El camión más chico que alcanza para la carga: así se aprovecha mejor su espacio."""
+        aptas = [(plan.capacidad, transporte) for transporte, plan, _motivo in self.cotizar_despachos(folio) if plan]
         return min(aptas, key=lambda item: item[0])[1] if aptas else None
 
     def confirmar_orden(self, folio: str, transporte: Transporte) -> str:

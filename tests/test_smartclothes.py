@@ -283,14 +283,13 @@ class ReglasTests(BodegaBase):
         self.assertIsInstance(self.sistema.transporte_sugerido(chica.folio), CamionLiviano)
         self.assertIsInstance(self.sistema.transporte_sugerido(grande.folio), CamionPesado)
         self.sistema.confirmar_orden(grande.folio, CamionPesado())
-        self.assertEqual(grande.despacho.costo, CamionPesado.TARIFA_BASE + 400 * CamionPesado.COSTO_POR_PRENDA)
         self.assertEqual(grande.despacho.ocupacion, 13)
         self.assertIn("Camión pesado", self.sistema.emitir_comprobante(grande.folio))
 
     def test_cada_camion_calcula_distinto_con_el_mismo_metodo(self):
         camiones: list[Transporte] = [CamionLiviano(), CamionPesado()]
-        costos = [camion.costo(250) for camion in camiones]
-        self.assertNotEqual(costos[0], costos[1])
+        self.assertEqual([camion.capacidad for camion in camiones], [300, 3000])
+        self.assertEqual([camion.carga_minima for camion in camiones], [1, 200])
         self.assertEqual([camion.puede_transportar(250) for camion in camiones], [True, True])
         self.assertEqual([camion.puede_transportar(50) for camion in camiones], [True, False])
         self.assertEqual([camion.puede_transportar(1500) for camion in camiones], [False, True])

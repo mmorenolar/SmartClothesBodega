@@ -35,8 +35,6 @@ td.num, th.num { text-align: right; }
 td img { width: 52px; height: 52px; object-fit: contain; background: #f8f9fb; border-radius: 4px; display: block; }
 .sku { font-family: Consolas, "Courier New", monospace; font-size: 12px; color: #4b5563; }
 .total { display: flex; justify-content: flex-end; align-items: center; gap: 18px; margin-top: 12px; }
-.total .costo { font-size: 13px; color: #6b7280; }
-.total .costo b { color: #1f2430; margin-left: 6px; }
 .total div { background: #2f6fed; color: #fff; border-radius: 6px; padding: 10px 18px; font-size: 14px; }
 .total div b { font-size: 18px; margin-left: 10px; }
 .observacion { border-left: 4px solid #a85f00; background: #fff3dd; padding: 10px 14px; border-radius: 4px; margin: 14px 0; }
@@ -86,7 +84,6 @@ def _traslado(datos: dict) -> str:
         "<table><thead><tr><th>Foto</th><th>SKU</th><th>Prenda</th><th>Talla</th><th>Color</th>"
         f"<th class='num'>Cantidad</th></tr></thead><tbody>{filas}</tbody></table>"
         '<div class="total">'
-        f'<span class="costo">Costo de despacho <b>{escape(datos["costo"])}</b></span>'
         f'<div>Total de unidades enviadas <b>{datos["unidades"]}</b></div></div>'
         '<div class="firmas"><div class="firma">Despachado por (bodega)</div>'
         '<div class="firma">Transportista</div><div class="firma">Recibido por (tienda)</div></div>'
